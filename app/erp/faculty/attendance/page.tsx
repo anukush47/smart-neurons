@@ -25,12 +25,15 @@ interface Period {
   students: Student[];
 }
 
-const INDIAN_NAMES = [
-  "Aarav Sharma", "Diya Patel", "Ishaan Gupta", "Priya Singh", "Arjun Mehta",
-  "Ananya Joshi", "Vihaan Verma", "Anika Tiwari", "Reyansh Kumar", "Saanvi Rao",
-  "Kabir Malhotra", "Myra Saxena", "Ayaan Khan", "Pari Kapoor", "Dhruv Agarwal",
-  "Kiara Nair", "Vivaan Bose", "Navya Pillai", "Aadi Mishra", "Riya Choudhary",
-];
+// Real student names — 3 per class (Nursery/LKG/UKG/JKG/SKG)
+const STUDENTS_BY_CLASS: Record<string, string[]> = {
+  "Nursery-A": ["Aarav Sharma", "Priya Verma", "Rohan Patel"],
+  "LKG-A":     ["Sneha Gupta", "Aditya Singh", "Kavya Nair"],
+  "UKG-A":     ["Rahul Mehta", "Ananya Das", "Vivek Joshi"],
+  "JKG-A":     ["Isha Kapoor", "Arjun Rao", "Meera Iyer"],
+  "SKG-A":     ["Siddharth Jain", "Pooja Malhotra", "Kunal Mishra"],
+};
+const INDIAN_NAMES = Object.values(STUDENTS_BY_CLASS).flat();
 
 function makeStudents(count: number, offset = 0): Student[] {
   return Array.from({ length: count }, (_, i) => ({
@@ -41,13 +44,17 @@ function makeStudents(count: number, offset = 0): Student[] {
   }));
 }
 
+function makeStudentsForClass(cls: string): Student[] {
+  const names = STUDENTS_BY_CLASS[cls] ?? INDIAN_NAMES.slice(0, 3);
+  return names.map((name, i) => ({ id: i + 1, name, roll: i + 1, status: "-" as AttStatus }));
+}
+
 const initialPeriods: Period[] = [
-  { id: 1, time: "8:00 – 8:40 AM",  subject: "English",   class: "JKG-A", room: "101", totalStudents: 18, locked: true,  students: makeStudents(18, 0) },
-  { id: 2, time: "8:45 – 9:25 AM",  subject: "Maths",     class: "SKG-A", room: "103", totalStudents: 16, locked: false, students: makeStudents(16, 18) },
-  { id: 3, time: "9:30 – 10:10 AM", subject: "English",   class: "JKG-B", room: "102", totalStudents: 17, locked: false, students: makeStudents(17, 34) },
-  { id: 4, time: "10:30 – 11:10 AM",subject: "Rhymes",    class: "Nursery-A", room: "104", totalStudents: 15, locked: false, students: makeStudents(15, 51) },
-  { id: 5, time: "11:15 – 11:55 AM",subject: "Drawing",   class: "JKG-A", room: "Art", totalStudents: 18, locked: false, students: makeStudents(18, 0) },
-  { id: 6, time: "12:00 – 12:40 PM",subject: "English",   class: "SKG-A", room: "103", totalStudents: 16, locked: false, students: makeStudents(16, 18) },
+  { id: 1, time: "8:00 – 8:40 AM",   subject: "English & Phonics", class: "Nursery-A", room: "101", totalStudents: 3, locked: false, students: makeStudentsForClass("Nursery-A") },
+  { id: 2, time: "8:45 – 9:25 AM",   subject: "Maths Concepts",    class: "LKG-A",     room: "102", totalStudents: 3, locked: false, students: makeStudentsForClass("LKG-A") },
+  { id: 3, time: "9:30 – 10:10 AM",  subject: "English & Rhymes",  class: "UKG-A",     room: "103", totalStudents: 3, locked: false, students: makeStudentsForClass("UKG-A") },
+  { id: 4, time: "10:30 – 11:10 AM", subject: "Hindi & Drawing",   class: "JKG-A",     room: "104", totalStudents: 3, locked: false, students: makeStudentsForClass("JKG-A") },
+  { id: 5, time: "11:15 – 11:55 AM", subject: "EVS & Activity",    class: "SKG-A",     room: "105", totalStudents: 3, locked: false, students: makeStudentsForClass("SKG-A") },
 ];
 
 const STATUS_CONFIG: Record<AttStatus, { label: string; bg: string; color: string; icon?: React.ReactNode }> = {

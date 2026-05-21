@@ -31,63 +31,36 @@ interface Student {
   avatar: string; // emoji
 }
 
-const CLASSES = ["All", "Playgroup", "Nursery", "JKG", "SKG"];
+const CLASSES = ["All", "Nursery", "LKG", "UKG", "JKG", "SKG"];
 const SECTIONS: Record<string, string[]> = {
-  Playgroup: ["A"],
-  Nursery:   ["A", "B"],
-  JKG:       ["A", "B"],
-  SKG:       ["A"],
+  Nursery: ["A"], LKG: ["A"], UKG: ["A"], JKG: ["A"], SKG: ["A"],
 };
 
-const AVATARS = ["🧒", "👧", "👦", "🧒‍♀️"];
-
 const RAW_STUDENTS: Omit<Student, "id" | "rollNo" | "avatar">[] = [
-  // Playgroup A
-  { name: "Myra Kapoor",      class: "Playgroup", section: "A", dob: "2023-08-12", gender: "F", blood: "B+",  parentName: "Rajan Kapoor",    parentPhone: "9876543210", address: "12, Sagar Vihar, Bhopal", admissionDate: "2026-04-01", status: "active",   fees: "paid"    },
-  { name: "Aryan Mehta",      class: "Playgroup", section: "A", dob: "2023-06-05", gender: "M", blood: "O+",  parentName: "Suresh Mehta",    parentPhone: "9876543211", address: "45, Arera Colony, Bhopal", admissionDate: "2026-04-01", status: "active",   fees: "due"     },
-  { name: "Saanvi Joshi",     class: "Playgroup", section: "A", dob: "2023-09-20", gender: "F", blood: "A+",  parentName: "Amit Joshi",      parentPhone: "9876543212", address: "7, Shahpura, Bhopal",      admissionDate: "2026-04-01", status: "active",   fees: "paid"    },
-  { name: "Dev Sharma",       class: "Playgroup", section: "A", dob: "2023-07-15", gender: "M", blood: "AB+", parentName: "Vikram Sharma",   parentPhone: "9876543213", address: "22, Kolar Road, Bhopal",   admissionDate: "2026-04-01", status: "active",   fees: "partial" },
-  { name: "Aanya Singh",      class: "Playgroup", section: "A", dob: "2023-10-02", gender: "F", blood: "O-",  parentName: "Deepak Singh",    parentPhone: "9876543214", address: "3, Govindpura, Bhopal",    admissionDate: "2026-04-01", status: "inactive", fees: "due"     },
+  // Nursery A — Teacher: Aarav Kumar
+  { name: "Aarav Sharma",   class: "Nursery", section: "A", dob: "2022-03-15", gender: "M", blood: "A+",  parentName: "Mr. Raj Sharma",      parentPhone: "9876543210", address: "18, MP Nagar, Bhopal",      admissionDate: "2025-04-01", status: "active", fees: "paid"    },
+  { name: "Priya Verma",    class: "Nursery", section: "A", dob: "2022-07-22", gender: "F", blood: "B+",  parentName: "Mrs. Sunita Verma",   parentPhone: "8765432109", address: "6, Lalghati, Bhopal",       admissionDate: "2025-04-01", status: "active", fees: "paid"    },
+  { name: "Rohan Patel",    class: "Nursery", section: "A", dob: "2022-01-10", gender: "M", blood: "O+",  parentName: "Mr. Dinesh Patel",    parentPhone: "7654321098", address: "31, Bittan Market, Bhopal", admissionDate: "2025-04-01", status: "active", fees: "due"     },
 
-  // Nursery A
-  { name: "Aarav Sharma",     class: "Nursery",   section: "A", dob: "2022-03-18", gender: "M", blood: "A+",  parentName: "Rohit Sharma",    parentPhone: "9871234560", address: "18, MP Nagar, Bhopal",     admissionDate: "2025-04-01", status: "active",   fees: "paid"    },
-  { name: "Diya Patel",       class: "Nursery",   section: "A", dob: "2022-05-22", gender: "F", blood: "B+",  parentName: "Nikhil Patel",    parentPhone: "9871234561", address: "6, Lalghati, Bhopal",      admissionDate: "2025-04-01", status: "active",   fees: "paid"    },
-  { name: "Ishaan Gupta",     class: "Nursery",   section: "A", dob: "2022-01-11", gender: "M", blood: "O+",  parentName: "Manish Gupta",    parentPhone: "9871234562", address: "31, Bittan Market, Bhopal", admissionDate: "2025-04-01", status: "active",   fees: "due"     },
-  { name: "Priya Singh",      class: "Nursery",   section: "A", dob: "2022-08-30", gender: "F", blood: "A-",  parentName: "Anil Singh",      parentPhone: "9871234563", address: "9, Bairagarh, Bhopal",     admissionDate: "2025-04-01", status: "active",   fees: "partial" },
-  { name: "Arjun Verma",      class: "Nursery",   section: "A", dob: "2022-11-14", gender: "M", blood: "B-",  parentName: "Sunil Verma",     parentPhone: "9871234564", address: "14, Berasia Road, Bhopal", admissionDate: "2025-04-01", status: "active",   fees: "paid"    },
-  { name: "Kavya Mishra",     class: "Nursery",   section: "A", dob: "2022-04-07", gender: "F", blood: "AB+", parentName: "Sanjay Mishra",   parentPhone: "9871234565", address: "27, TT Nagar, Bhopal",     admissionDate: "2025-04-01", status: "active",   fees: "paid"    },
+  // LKG A — Teacher: Neha Sharma
+  { name: "Sneha Gupta",    class: "LKG",     section: "A", dob: "2021-05-18", gender: "F", blood: "A+",  parentName: "Mr. Anil Gupta",      parentPhone: "6543210987", address: "2, Shivaji Nagar, Bhopal",  admissionDate: "2024-04-01", status: "active", fees: "paid"    },
+  { name: "Aditya Singh",   class: "LKG",     section: "A", dob: "2021-09-30", gender: "M", blood: "O+",  parentName: "Mrs. Kavita Singh",   parentPhone: "5432109876", address: "16, Arera Colony, Bhopal",  admissionDate: "2024-04-01", status: "active", fees: "paid"    },
+  { name: "Kavya Nair",     class: "LKG",     section: "A", dob: "2021-12-25", gender: "F", blood: "B+",  parentName: "Mr. Suresh Nair",     parentPhone: "4321098765", address: "41, Tulsi Nagar, Bhopal",   admissionDate: "2024-04-01", status: "active", fees: "due"     },
 
-  // Nursery B
-  { name: "Vihaan Tiwari",    class: "Nursery",   section: "B", dob: "2022-02-25", gender: "M", blood: "O+",  parentName: "Gaurav Tiwari",   parentPhone: "9873456780", address: "5, Kotra, Bhopal",         admissionDate: "2025-04-01", status: "active",   fees: "paid"    },
-  { name: "Anika Rao",        class: "Nursery",   section: "B", dob: "2022-06-16", gender: "F", blood: "A+",  parentName: "Pradeep Rao",     parentPhone: "9873456781", address: "11, Hoshangabad Rd, Bhopal",admissionDate: "2025-04-01", status: "active",   fees: "due"     },
-  { name: "Reyansh Kumar",    class: "Nursery",   section: "B", dob: "2022-09-03", gender: "M", blood: "B+",  parentName: "Santosh Kumar",   parentPhone: "9873456782", address: "19, Kamla Nagar, Bhopal",  admissionDate: "2025-04-01", status: "active",   fees: "paid"    },
-  { name: "Nadia Khan",       class: "Nursery",   section: "B", dob: "2022-12-21", gender: "F", blood: "O-",  parentName: "Farrukh Khan",    parentPhone: "9873456783", address: "8, Piplani, Bhopal",       admissionDate: "2025-04-01", status: "active",   fees: "partial" },
-  { name: "Kabir Malhotra",   class: "Nursery",   section: "B", dob: "2022-07-09", gender: "M", blood: "AB-", parentName: "Rajesh Malhotra", parentPhone: "9873456784", address: "33, Ashoka Garden, Bhopal", admissionDate: "2025-04-01", status: "active",   fees: "paid"    },
+  // UKG A — Teacher: Rohan Singh
+  { name: "Rahul Mehta",    class: "UKG",     section: "A", dob: "2020-08-14", gender: "M", blood: "B+",  parentName: "Mr. Vijay Mehta",     parentPhone: "3210987654", address: "8, Sehore Road, Bhopal",    admissionDate: "2023-04-01", status: "active", fees: "paid"    },
+  { name: "Ananya Das",     class: "UKG",     section: "A", dob: "2020-04-20", gender: "F", blood: "A-",  parentName: "Mrs. Priyanka Das",   parentPhone: "2109876543", address: "21, Awadhpuri, Bhopal",     admissionDate: "2023-04-01", status: "active", fees: "paid"    },
+  { name: "Vivek Joshi",    class: "UKG",     section: "A", dob: "2020-11-05", gender: "M", blood: "O+",  parentName: "Mr. Ramesh Joshi",    parentPhone: "1098765432", address: "13, Nehru Nagar, Bhopal",   admissionDate: "2023-04-01", status: "active", fees: "partial" },
 
-  // JKG A
-  { name: "Ananya Joshi",     class: "JKG",       section: "A", dob: "2021-04-14", gender: "F", blood: "A+",  parentName: "Amit Joshi",      parentPhone: "9869012340", address: "2, Shivaji Nagar, Bhopal", admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-  { name: "Vivaan Saxena",    class: "JKG",       section: "A", dob: "2021-02-28", gender: "M", blood: "O+",  parentName: "Pankaj Saxena",   parentPhone: "9869012341", address: "16, Jahangirabad, Bhopal", admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-  { name: "Ayaan Nair",       class: "JKG",       section: "A", dob: "2021-08-17", gender: "M", blood: "B+",  parentName: "Manoj Nair",      parentPhone: "9869012342", address: "41, Tulsi Nagar, Bhopal",  admissionDate: "2024-04-01", status: "active",   fees: "due"     },
-  { name: "Pari Kapoor",      class: "JKG",       section: "A", dob: "2021-05-31", gender: "F", blood: "A-",  parentName: "Rahul Kapoor",    parentPhone: "9869012343", address: "7, Chuna Bhatti, Bhopal",  admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-  { name: "Dhruv Agarwal",    class: "JKG",       section: "A", dob: "2021-11-09", gender: "M", blood: "O-",  parentName: "Vikas Agarwal",   parentPhone: "9869012344", address: "23, Katara Hills, Bhopal", admissionDate: "2024-04-01", status: "active",   fees: "partial" },
-  { name: "Kiara Pillai",     class: "JKG",       section: "A", dob: "2021-03-25", gender: "F", blood: "B-",  parentName: "Rajan Pillai",    parentPhone: "9869012345", address: "10, Indrapuri, Bhopal",    admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-  { name: "Navya Bose",       class: "JKG",       section: "A", dob: "2021-07-13", gender: "F", blood: "AB+", parentName: "Subhash Bose",    parentPhone: "9869012346", address: "38, Idgah Hills, Bhopal",  admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
+  // JKG A — Teacher: Priya Patel
+  { name: "Isha Kapoor",    class: "JKG",     section: "A", dob: "2021-02-28", gender: "F", blood: "AB+", parentName: "Mrs. Meena Kapoor",   parentPhone: "9987654321", address: "7, Chuna Bhatti, Bhopal",   admissionDate: "2024-04-01", status: "active", fees: "paid"    },
+  { name: "Arjun Rao",      class: "JKG",     section: "A", dob: "2021-06-15", gender: "M", blood: "O-",  parentName: "Mr. Krishna Rao",     parentPhone: "8876543210", address: "23, Katara Hills, Bhopal",  admissionDate: "2024-04-01", status: "active", fees: "paid"    },
+  { name: "Meera Iyer",     class: "JKG",     section: "A", dob: "2021-10-08", gender: "F", blood: "B-",  parentName: "Mrs. Lakshmi Iyer",   parentPhone: "7765432109", address: "10, Indrapuri, Bhopal",     admissionDate: "2024-04-01", status: "active", fees: "due"     },
 
-  // JKG B
-  { name: "Aadi Choudhary",   class: "JKG",       section: "B", dob: "2021-01-20", gender: "M", blood: "A+",  parentName: "Dinesh Choudhary",parentPhone: "9865432100", address: "55, Saket Nagar, Bhopal",  admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-  { name: "Riya Dwivedi",     class: "JKG",       section: "B", dob: "2021-06-04", gender: "F", blood: "O+",  parentName: "Kamal Dwivedi",   parentPhone: "9865432101", address: "4, Rani Kamlapati, Bhopal",admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-  { name: "Zara Ahmed",       class: "JKG",       section: "B", dob: "2021-09-18", gender: "F", blood: "B+",  parentName: "Imran Ahmed",     parentPhone: "9865432102", address: "12, Imami Gate, Bhopal",   admissionDate: "2024-04-01", status: "active",   fees: "due"     },
-  { name: "Shiv Pandey",      class: "JKG",       section: "B", dob: "2021-12-08", gender: "M", blood: "AB+", parentName: "Om Pandey",       parentPhone: "9865432103", address: "29, Peer Gate, Bhopal",    admissionDate: "2024-04-01", status: "active",   fees: "partial" },
-  { name: "Mira Thakur",      class: "JKG",       section: "B", dob: "2021-04-02", gender: "F", blood: "O-",  parentName: "Harish Thakur",   parentPhone: "9865432104", address: "17, Ashima Enclave, Bhopal",admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-  { name: "Arnav Dixit",      class: "JKG",       section: "B", dob: "2021-10-27", gender: "M", blood: "A-",  parentName: "Ramesh Dixit",    parentPhone: "9865432105", address: "6, Koh-e-Fiza, Bhopal",   admissionDate: "2024-04-01", status: "active",   fees: "paid"    },
-
-  // SKG A
-  { name: "Saanvi Iyer",      class: "SKG",       section: "A", dob: "2020-03-11", gender: "F", blood: "B+",  parentName: "Ravi Iyer",       parentPhone: "9862109870", address: "8, Sehore Road, Bhopal",   admissionDate: "2023-04-01", status: "active",   fees: "paid"    },
-  { name: "Krish Gupta",      class: "SKG",       section: "A", dob: "2020-07-29", gender: "M", blood: "O+",  parentName: "Hemant Gupta",    parentPhone: "9862109871", address: "21, Awadhpuri, Bhopal",    admissionDate: "2023-04-01", status: "active",   fees: "paid"    },
-  { name: "Tarini Bhatt",     class: "SKG",       section: "A", dob: "2020-11-16", gender: "F", blood: "A+",  parentName: "Ashish Bhatt",    parentPhone: "9862109872", address: "13, Nehru Nagar, Bhopal",  admissionDate: "2023-04-01", status: "active",   fees: "due"     },
-  { name: "Advik Sahu",       class: "SKG",       section: "A", dob: "2020-05-05", gender: "M", blood: "AB+", parentName: "Vinay Sahu",      parentPhone: "9862109873", address: "37, Misrod, Bhopal",       admissionDate: "2023-04-01", status: "active",   fees: "partial" },
-  { name: "Yara Hashmi",      class: "SKG",       section: "A", dob: "2020-09-22", gender: "F", blood: "O-",  parentName: "Tariq Hashmi",    parentPhone: "9862109874", address: "3, New Market, Bhopal",    admissionDate: "2023-04-01", status: "active",   fees: "paid"    },
-  { name: "Rudra Tripathi",   class: "SKG",       section: "A", dob: "2020-01-30", gender: "M", blood: "B-",  parentName: "Shiv Tripathi",   parentPhone: "9862109875", address: "44, Lalghati, Bhopal",     admissionDate: "2023-04-01", status: "active",   fees: "paid"    },
+  // SKG A — Teacher: Vikram Verma
+  { name: "Siddharth Jain", class: "SKG",     section: "A", dob: "2020-01-20", gender: "M", blood: "A+",  parentName: "Mr. Mahesh Jain",     parentPhone: "6654321098", address: "37, Misrod, Bhopal",        admissionDate: "2023-04-01", status: "active", fees: "paid"    },
+  { name: "Pooja Malhotra", class: "SKG",     section: "A", dob: "2020-06-12", gender: "F", blood: "B+",  parentName: "Mrs. Ritu Malhotra",  parentPhone: "5543210987", address: "3, New Market, Bhopal",     admissionDate: "2023-04-01", status: "active", fees: "paid"    },
+  { name: "Kunal Mishra",   class: "SKG",     section: "A", dob: "2020-09-18", gender: "M", blood: "O+",  parentName: "Mr. Shiv Mishra",     parentPhone: "4432109876", address: "44, Lalghati, Bhopal",      admissionDate: "2023-04-01", status: "active", fees: "partial" },
 ];
 
 const STUDENTS: Student[] = RAW_STUDENTS.map((s, i) => ({

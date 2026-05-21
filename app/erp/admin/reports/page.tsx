@@ -32,33 +32,78 @@ const GRADE_COLOR: Record<string, string> = {
 
 const REPORTS: StudentReport[] = [
   {
-    id: "R1", name: "Aarav Sharma", roll: "JKG-A-01", class: "JKG", section: "A", term: "Term 1",
-    attendance: 94, conduct: "Excellent", promoted: true,
+    id: "R1", name: "Aarav Sharma", roll: "NUR-01", class: "Nursery", section: "A", term: "Term 1",
+    attendance: 91, conduct: "Excellent", promoted: true,
     teacherRemark: "Aarav is a bright and enthusiastic learner. Excels in art and language.",
     subjects: [
-      { subject: "English", marks: 48, max: 50, grade: "A+" },
-      { subject: "Hindi", marks: 44, max: 50, grade: "A" },
-      { subject: "Mathematics", marks: 46, max: 50, grade: "A+" },
-      { subject: "EVS", marks: 42, max: 50, grade: "A" },
+      { subject: "English", marks: 46, max: 50, grade: "A+" },
+      { subject: "Hindi", marks: 42, max: 50, grade: "A" },
+      { subject: "Mathematics", marks: 44, max: 50, grade: "A+" },
       { subject: "Art & Craft", marks: 50, max: 50, grade: "A+" },
     ],
   },
   {
-    id: "R2", name: "Priya Gupta", roll: "JKG-A-02", class: "JKG", section: "A", term: "Term 1",
+    id: "R2", name: "Priya Verma", roll: "NUR-02", class: "Nursery", section: "A", term: "Term 1",
     attendance: 88, conduct: "Good", promoted: true,
     teacherRemark: "Priya shows good progress. Needs more practice with Hindi vowels.",
     subjects: [
       { subject: "English", marks: 40, max: 50, grade: "A" },
       { subject: "Hindi", marks: 34, max: 50, grade: "B" },
       { subject: "Mathematics", marks: 38, max: 50, grade: "A" },
-      { subject: "EVS", marks: 36, max: 50, grade: "B" },
       { subject: "Art & Craft", marks: 44, max: 50, grade: "A" },
     ],
   },
   {
-    id: "R3", name: "Rohan Singh", roll: "SKG-A-01", class: "SKG", section: "A", term: "Term 1",
+    id: "R3", name: "Rohan Patel", roll: "NUR-03", class: "Nursery", section: "A", term: "Term 1",
+    attendance: 82, conduct: "Good", promoted: true,
+    teacherRemark: "Rohan is adapting well. Very enthusiastic during activity sessions.",
+    subjects: [
+      { subject: "English", marks: 37, max: 50, grade: "B" },
+      { subject: "Hindi", marks: 35, max: 50, grade: "B" },
+      { subject: "Mathematics", marks: 36, max: 50, grade: "B" },
+      { subject: "Art & Craft", marks: 45, max: 50, grade: "A+" },
+    ],
+  },
+  {
+    id: "R4", name: "Sneha Gupta", roll: "LKG-01", class: "LKG", section: "A", term: "Term 1",
+    attendance: 94, conduct: "Excellent", promoted: true,
+    teacherRemark: "Sneha is a quick learner with excellent communication skills.",
+    subjects: [
+      { subject: "English", marks: 48, max: 50, grade: "A+" },
+      { subject: "Hindi", marks: 45, max: 50, grade: "A+" },
+      { subject: "Mathematics", marks: 47, max: 50, grade: "A+" },
+      { subject: "EVS", marks: 44, max: 50, grade: "A" },
+      { subject: "Art & Craft", marks: 49, max: 50, grade: "A+" },
+    ],
+  },
+  {
+    id: "R5", name: "Aditya Singh", roll: "LKG-02", class: "LKG", section: "A", term: "Term 1",
+    attendance: 87, conduct: "Very Good", promoted: true,
+    teacherRemark: "Aditya performs consistently. Shows leadership in group activities.",
+    subjects: [
+      { subject: "English", marks: 43, max: 50, grade: "A" },
+      { subject: "Hindi", marks: 40, max: 50, grade: "A" },
+      { subject: "Mathematics", marks: 44, max: 50, grade: "A" },
+      { subject: "EVS", marks: 38, max: 50, grade: "A" },
+      { subject: "Art & Craft", marks: 42, max: 50, grade: "A" },
+    ],
+  },
+  {
+    id: "R6", name: "Kavya Nair", roll: "LKG-03", class: "LKG", section: "A", term: "Term 1",
+    attendance: 79, conduct: "Satisfactory", promoted: true,
+    teacherRemark: "Kavya is creative but needs to improve attendance and focus.",
+    subjects: [
+      { subject: "English", marks: 32, max: 50, grade: "B" },
+      { subject: "Hindi", marks: 30, max: 50, grade: "C" },
+      { subject: "Mathematics", marks: 35, max: 50, grade: "B" },
+      { subject: "EVS", marks: 33, max: 50, grade: "B" },
+      { subject: "Art & Craft", marks: 46, max: 50, grade: "A+" },
+    ],
+  },
+  {
+    id: "R7", name: "Rahul Mehta", roll: "UKG-01", class: "UKG", section: "A", term: "Term 1",
     attendance: 96, conduct: "Excellent", promoted: true,
-    teacherRemark: "Rohan is outstanding in all subjects. A natural leader in class.",
+    teacherRemark: "Rahul is outstanding in all subjects. A natural leader in class.",
     subjects: [
       { subject: "English", marks: 49, max: 50, grade: "A+" },
       { subject: "Hindi", marks: 47, max: 50, grade: "A+" },
@@ -69,9 +114,87 @@ const REPORTS: StudentReport[] = [
     ],
   },
   {
-    id: "R4", name: "Ananya Patel", roll: "SKG-B-01", class: "SKG", section: "B", term: "Term 1",
-    attendance: 78, conduct: "Satisfactory", promoted: true,
-    teacherRemark: "Ananya needs more regularity. Good in art but should focus more on academics.",
+    id: "R8", name: "Ananya Das", roll: "UKG-02", class: "UKG", section: "A", term: "Term 1",
+    attendance: 90, conduct: "Very Good", promoted: true,
+    teacherRemark: "Ananya is focused and hardworking. Excellent in languages.",
+    subjects: [
+      { subject: "English", marks: 46, max: 50, grade: "A+" },
+      { subject: "Hindi", marks: 44, max: 50, grade: "A" },
+      { subject: "Mathematics", marks: 40, max: 50, grade: "A" },
+      { subject: "EVS", marks: 41, max: 50, grade: "A" },
+      { subject: "Art & Craft", marks: 43, max: 50, grade: "A" },
+      { subject: "GK", marks: 38, max: 50, grade: "A" },
+    ],
+  },
+  {
+    id: "R9", name: "Vivek Joshi", roll: "UKG-03", class: "UKG", section: "A", term: "Term 1",
+    attendance: 85, conduct: "Good", promoted: true,
+    teacherRemark: "Vivek is creative and curious. Needs more focus during class sessions.",
+    subjects: [
+      { subject: "English", marks: 38, max: 50, grade: "A" },
+      { subject: "Hindi", marks: 36, max: 50, grade: "B" },
+      { subject: "Mathematics", marks: 42, max: 50, grade: "A" },
+      { subject: "EVS", marks: 35, max: 50, grade: "B" },
+      { subject: "Art & Craft", marks: 47, max: 50, grade: "A+" },
+      { subject: "GK", marks: 34, max: 50, grade: "B" },
+    ],
+  },
+  {
+    id: "R10", name: "Isha Kapoor", roll: "JKG-01", class: "JKG", section: "A", term: "Term 1",
+    attendance: 93, conduct: "Excellent", promoted: true,
+    teacherRemark: "Isha is diligent and participates actively in all activities.",
+    subjects: [
+      { subject: "English", marks: 47, max: 50, grade: "A+" },
+      { subject: "Hindi", marks: 43, max: 50, grade: "A" },
+      { subject: "Mathematics", marks: 45, max: 50, grade: "A+" },
+      { subject: "EVS", marks: 42, max: 50, grade: "A" },
+      { subject: "Art & Craft", marks: 48, max: 50, grade: "A+" },
+      { subject: "GK", marks: 41, max: 50, grade: "A" },
+    ],
+  },
+  {
+    id: "R11", name: "Arjun Rao", roll: "JKG-02", class: "JKG", section: "A", term: "Term 1",
+    attendance: 86, conduct: "Good", promoted: true,
+    teacherRemark: "Arjun is enthusiastic and friendly. Should practice writing more at home.",
+    subjects: [
+      { subject: "English", marks: 39, max: 50, grade: "A" },
+      { subject: "Hindi", marks: 37, max: 50, grade: "B" },
+      { subject: "Mathematics", marks: 41, max: 50, grade: "A" },
+      { subject: "EVS", marks: 36, max: 50, grade: "B" },
+      { subject: "Art & Craft", marks: 44, max: 50, grade: "A" },
+      { subject: "GK", marks: 35, max: 50, grade: "B" },
+    ],
+  },
+  {
+    id: "R12", name: "Meera Iyer", roll: "JKG-03", class: "JKG", section: "A", term: "Term 1",
+    attendance: 92, conduct: "Very Good", promoted: true,
+    teacherRemark: "Meera is a thoughtful student with excellent observation skills.",
+    subjects: [
+      { subject: "English", marks: 44, max: 50, grade: "A" },
+      { subject: "Hindi", marks: 42, max: 50, grade: "A" },
+      { subject: "Mathematics", marks: 43, max: 50, grade: "A" },
+      { subject: "EVS", marks: 40, max: 50, grade: "A" },
+      { subject: "Art & Craft", marks: 46, max: 50, grade: "A+" },
+      { subject: "GK", marks: 39, max: 50, grade: "A" },
+    ],
+  },
+  {
+    id: "R13", name: "Siddharth Jain", roll: "SKG-01", class: "SKG", section: "A", term: "Term 1",
+    attendance: 95, conduct: "Excellent", promoted: true,
+    teacherRemark: "Siddharth excels in mathematics and science concepts. A model student.",
+    subjects: [
+      { subject: "English", marks: 46, max: 50, grade: "A+" },
+      { subject: "Hindi", marks: 45, max: 50, grade: "A+" },
+      { subject: "Mathematics", marks: 50, max: 50, grade: "A+" },
+      { subject: "EVS", marks: 47, max: 50, grade: "A+" },
+      { subject: "Art & Craft", marks: 43, max: 50, grade: "A" },
+      { subject: "GK", marks: 46, max: 50, grade: "A+" },
+    ],
+  },
+  {
+    id: "R14", name: "Pooja Malhotra", roll: "SKG-02", class: "SKG", section: "A", term: "Term 1",
+    attendance: 80, conduct: "Satisfactory", promoted: true,
+    teacherRemark: "Pooja needs more regularity. Good in art but should focus more on academics.",
     subjects: [
       { subject: "English", marks: 30, max: 50, grade: "C" },
       { subject: "Hindi", marks: 28, max: 50, grade: "C" },
@@ -82,24 +205,16 @@ const REPORTS: StudentReport[] = [
     ],
   },
   {
-    id: "R5", name: "Kavya Iyer", roll: "NUR-A-01", class: "Nursery", section: "A", term: "Term 1",
-    attendance: 91, conduct: "Very Good", promoted: true,
-    teacherRemark: "Kavya is a quick learner with good communication skills.",
+    id: "R15", name: "Kunal Mishra", roll: "SKG-03", class: "SKG", section: "A", term: "Term 1",
+    attendance: 89, conduct: "Good", promoted: true,
+    teacherRemark: "Kunal shows steady improvement. Active participant during GK sessions.",
     subjects: [
-      { subject: "English", marks: 43, max: 50, grade: "A" },
-      { subject: "Hindi", marks: 41, max: 50, grade: "A" },
-      { subject: "Mathematics", marks: 39, max: 50, grade: "A" },
-      { subject: "Art & Craft", marks: 46, max: 50, grade: "A+" },
-    ],
-  },
-  {
-    id: "R6", name: "Dev Mehta", roll: "PG-A-01", class: "Playgroup", section: "A", term: "Term 1",
-    attendance: 85, conduct: "Good", promoted: true,
-    teacherRemark: "Dev is adapting well to school. Shows great curiosity and enthusiasm.",
-    subjects: [
-      { subject: "English", marks: 38, max: 50, grade: "A" },
-      { subject: "Hindi", marks: 36, max: 50, grade: "B" },
-      { subject: "Art & Craft", marks: 45, max: 50, grade: "A+" },
+      { subject: "English", marks: 41, max: 50, grade: "A" },
+      { subject: "Hindi", marks: 38, max: 50, grade: "A" },
+      { subject: "Mathematics", marks: 43, max: 50, grade: "A" },
+      { subject: "EVS", marks: 37, max: 50, grade: "B" },
+      { subject: "Art & Craft", marks: 42, max: 50, grade: "A" },
+      { subject: "GK", marks: 44, max: 50, grade: "A" },
     ],
   },
 ];
@@ -114,7 +229,7 @@ function avgColor(a: number) {
   return "#FF6B6B";
 }
 
-const CLASSES = ["All", "Playgroup", "Nursery", "JKG", "SKG"];
+const CLASSES = ["All", "Nursery", "LKG", "UKG", "JKG", "SKG"];
 const TERMS = ["All", "Term 1", "Term 2"];
 
 export default function AdminReportsPage() {

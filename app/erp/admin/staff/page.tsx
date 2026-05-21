@@ -56,58 +56,64 @@ const STATUS_STYLE: Record<LeaveStatus, { label: string; bg: string; color: stri
 
 const STAFF_DATA: StaffMember[] = [
   {
-    id: 1, name: "Ms. Priya Sharma", role: "Teacher", designation: "Class Teacher — JKG-A",
-    classes: ["JKG-A", "SKG-A"], phone: "9801234567", email: "priya@smartneurons.in",
+    id: 1, name: "Aarav Kumar", role: "Teacher", designation: "Class Teacher — Nursery-A",
+    classes: ["Nursery-A"], phone: "9876511111", email: "aarav@smartneurons.in",
+    joinDate: "2023-04-01", status: "active", avatar: "👨‍🏫",
+    casualBalance: 10, sickBalance: 7,
+    leaves: [
+      { id: "L001", from: "2026-04-22", to: "2026-04-22", days: 1, type: "Casual", reason: "Personal work.", status: "approved", appliedOn: "2026-04-20" },
+      { id: "L002", from: "2026-06-10", to: "2026-06-11", days: 2, type: "Personal", reason: "Family function in hometown.", status: "pending", appliedOn: "2026-05-18" },
+    ],
+  },
+  {
+    id: 2, name: "Neha Sharma", role: "Teacher", designation: "Class Teacher — LKG-A",
+    classes: ["LKG-A"], phone: "8765422222", email: "neha@smartneurons.in",
     joinDate: "2022-06-01", status: "active", avatar: "👩‍🏫",
     casualBalance: 8, sickBalance: 5,
     leaves: [
-      { id: "L001", from: "2026-05-05", to: "2026-05-05", days: 1, type: "Sick",      reason: "Fever and cold.", status: "approved", appliedOn: "2026-05-04", adminNote: "Get well soon." },
-      { id: "L002", from: "2026-06-10", to: "2026-06-11", days: 2, type: "Personal",  reason: "Family function in hometown.", status: "pending", appliedOn: "2026-05-18" },
+      { id: "L003", from: "2026-05-05", to: "2026-05-05", days: 1, type: "Sick", reason: "Fever and cold.", status: "approved", appliedOn: "2026-05-04", adminNote: "Get well soon." },
+      { id: "L004", from: "2026-05-22", to: "2026-05-23", days: 2, type: "Casual", reason: "Attending a wedding.", status: "pending", appliedOn: "2026-05-19" },
     ],
   },
   {
-    id: 2, name: "Ms. Kavya Reddy", role: "Teacher", designation: "Class Teacher — Nursery-A",
-    classes: ["Nursery-A", "Nursery-B"], phone: "9802345678", email: "kavya@smartneurons.in",
-    joinDate: "2023-04-01", status: "active", avatar: "👩‍🏫",
-    casualBalance: 10, sickBalance: 7,
-    leaves: [
-      { id: "L003", from: "2026-04-22", to: "2026-04-22", days: 1, type: "Casual",    reason: "Personal work.", status: "approved", appliedOn: "2026-04-20" },
-      { id: "L004", from: "2026-05-22", to: "2026-05-23", days: 2, type: "Casual",    reason: "Attending a wedding.", status: "pending", appliedOn: "2026-05-19" },
-    ],
-  },
-  {
-    id: 3, name: "Ms. Sunita Patil", role: "Teacher", designation: "Class Teacher — Playgroup-A",
-    classes: ["Playgroup-A"], phone: "9803456789", email: "sunita@smartneurons.in",
-    joinDate: "2021-07-01", status: "active", avatar: "👩‍🏫",
+    id: 3, name: "Rohan Singh", role: "Teacher", designation: "Class Teacher — UKG-A",
+    classes: ["UKG-A"], phone: "7654333333", email: "rohan@smartneurons.in",
+    joinDate: "2021-07-01", status: "active", avatar: "👨‍🏫",
     casualBalance: 6, sickBalance: 3,
     leaves: [
-      { id: "L005", from: "2026-05-14", to: "2026-05-14", days: 1, type: "Sick",      reason: "Doctor's appointment.", status: "approved", appliedOn: "2026-05-13" },
-      { id: "L006", from: "2026-05-20", to: "2026-05-20", days: 1, type: "Emergency", reason: "Family emergency — urgent travel needed.", status: "pending", appliedOn: "2026-05-20" },
+      { id: "L005", from: "2026-05-14", to: "2026-05-14", days: 1, type: "Sick", reason: "Doctor's appointment.", status: "approved", appliedOn: "2026-05-13" },
     ],
   },
   {
-    id: 4, name: "Mr. Rahul Tiwari", role: "Coordinator", designation: "Academic Coordinator",
-    classes: [], phone: "9804567890", email: "rahul@smartneurons.in",
-    joinDate: "2020-03-15", status: "active", avatar: "👨‍💼",
+    id: 4, name: "Priya Patel", role: "Teacher", designation: "Class Teacher — JKG-A",
+    classes: ["JKG-A"], phone: "6543244444", email: "priya@smartneurons.in",
+    joinDate: "2022-08-01", status: "active", avatar: "👩‍🏫",
     casualBalance: 9, sickBalance: 8,
     leaves: [
-      { id: "L007", from: "2026-04-15", to: "2026-04-16", days: 2, type: "Casual",    reason: "Personal errands.", status: "approved", appliedOn: "2026-04-10" },
+      { id: "L006", from: "2026-04-15", to: "2026-04-16", days: 2, type: "Casual", reason: "Personal errands.", status: "approved", appliedOn: "2026-04-10" },
     ],
   },
   {
-    id: 5, name: "Ms. Anjali Nair", role: "Support", designation: "Admin Assistant",
-    classes: [], phone: "9805678901", email: "anjali@smartneurons.in",
-    joinDate: "2023-09-01", status: "on-leave", avatar: "👩‍💼",
-    casualBalance: 4, sickBalance: 6,
-    leaves: [
-      { id: "L008", from: "2026-05-19", to: "2026-05-21", days: 3, type: "Sick",      reason: "Viral fever — doctor advised rest.", status: "approved", appliedOn: "2026-05-18" },
-    ],
+    id: 5, name: "Vikram Verma", role: "Teacher", designation: "Class Teacher — SKG-A",
+    classes: ["SKG-A"], phone: "5432155555", email: "vikram@smartneurons.in",
+    joinDate: "2020-03-15", status: "active", avatar: "👨‍🏫",
+    casualBalance: 9, sickBalance: 8,
+    leaves: [],
   },
   {
-    id: 6, name: "Mr. Deepak Mishra", role: "Support", designation: "Peon / Helper",
-    classes: [], phone: "9806789012", email: "deepak@smartneurons.in",
-    joinDate: "2022-01-10", status: "active", avatar: "👨‍🔧",
+    id: 6, name: "Khushboo P", role: "Coordinator", designation: "School Administrator",
+    classes: [], phone: "4321066666", email: "khushboo.p@smartneurons.in",
+    joinDate: "2021-01-10", status: "active", avatar: "👩‍💼",
     casualBalance: 10, sickBalance: 10,
+    leaves: [
+      { id: "L007", from: "2026-05-19", to: "2026-05-21", days: 3, type: "Sick", reason: "Viral fever — doctor advised rest.", status: "pending", appliedOn: "2026-05-18" },
+    ],
+  },
+  {
+    id: 7, name: "Ms. Principal", role: "Coordinator", designation: "School Principal",
+    classes: [], phone: "3210977777", email: "principal@smartneurons.in",
+    joinDate: "2019-06-01", status: "active", avatar: "👩‍💼",
+    casualBalance: 12, sickBalance: 10,
     leaves: [],
   },
 ];
@@ -156,7 +162,7 @@ export default function AdminStaffPage() {
       );
       const onLeave = newLeaves.some(l => {
         if (l.status !== "approved") return false;
-        const today = "2026-05-20";
+        const today = new Date().toISOString().slice(0, 10);
         return l.from <= today && l.to >= today;
       });
       return { ...s, leaves: newLeaves, status: onLeave ? "on-leave" : "active" };
