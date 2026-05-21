@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { ChevronLeft, ChevronRight, Calendar, TrendingUp, Award } from "lucide-react";
 
@@ -67,16 +67,16 @@ const MONTH_NAMES = [
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function ParentAttendancePage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [viewYear, setViewYear] = useState(2026);
   const [viewMonth, setViewMonth] = useState(4); // May
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   const monthData = buildMonthData(viewYear, viewMonth);

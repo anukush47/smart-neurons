@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import {
   Search, Filter, X, ChevronDown, ChevronUp,
@@ -106,7 +106,6 @@ const FEE_STYLE = {
 };
 
 export default function AdminStudentsPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("All");
@@ -116,10 +115,11 @@ export default function AdminStudentsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "admin@smartneurons.in");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   const sections = classFilter !== "All"

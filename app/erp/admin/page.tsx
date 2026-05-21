@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import {
   Users, GraduationCap, ClipboardList, CreditCard, TrendingUp,
@@ -36,14 +36,14 @@ const birthdays = [
 ];
 
 export default function AdminDashboard() {
-  const router = useRouter();
   const [user, setUser] = useState("");
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "admin@smartneurons.in");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   return (

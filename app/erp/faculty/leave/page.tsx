@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import {
   Plus, CheckCircle, XCircle, Clock,
@@ -57,7 +57,6 @@ function fmt(d: string) {
 }
 
 export default function FacultyLeavePage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [leaves, setLeaves]           = useState<LeaveRequest[]>(INITIAL_LEAVES);
   const [showForm, setShowForm]       = useState(false);
@@ -75,10 +74,11 @@ export default function FacultyLeavePage() {
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "faculty") { router.replace("/erp/login"); return; }
-    setUser(u || "Ms. Priya Sharma");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Faculty");
+    });
   }, []);
 
   function handleSubmit() {

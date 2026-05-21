@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { CheckCircle, XCircle, Clock, BookOpen, ChevronDown, ChevronUp, Save, Lock, Users } from "lucide-react";
 
@@ -59,17 +58,17 @@ const STATUS_CONFIG: Record<AttStatus, { label: string; bg: string; color: strin
 };
 
 export default function FacultyAttendancePage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [periods, setPeriods] = useState<Period[]>(initialPeriods);
   const [expanded, setExpanded] = useState<number | null>(2);
   const [saved, setSaved] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "faculty") { router.replace("/erp/login"); return; }
-    setUser(u || "Ms. Priya Sharma");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Faculty");
+    });
   }, []);
 
   function setStatus(periodId: number, studentId: number, status: AttStatus) {

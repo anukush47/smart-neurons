@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { CheckCircle, AlertCircle, CreditCard, BookOpen, Bell, Calendar, Star, ChevronRight, MessageSquare } from "lucide-react";
 
@@ -35,17 +35,17 @@ const feeSummary = {
 };
 
 export default function ParentDashboard() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [childName] = useState("Aarav");
   const [childClass] = useState("JKG-A");
   const [childAge] = useState("4 yrs");
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   return (

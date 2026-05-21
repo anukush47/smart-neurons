@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { createClient } from "@/lib/supabase/client";
 
 type Role = "superadmin" | "admin" | "faculty" | "parent";
 
@@ -101,7 +102,7 @@ export default function ERPLoginPage() {
     setStep(2);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRole) return;
     if (!loginValue.trim() || !password.trim()) {
@@ -110,14 +111,31 @@ export default function ERPLoginPage() {
     }
     setError("");
     setLoading(true);
-    // Simulate auth delay
-    setTimeout(() => {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("erp_role", selectedRole!);
-        sessionStorage.setItem("erp_user", loginValue);
+
+    try {
+      const supabase = createClient();
+      const isPhoneLogin = activeRole?.loginField === "phone";
+      const credentials = isPhoneLogin
+        ? { phone: loginValue, password }
+        : { email: loginValue, password };
+      const { data, error: authError } = await supabase.auth.signInWithPassword(credentials);
+
+      if (authError) {
+        setError(authError.message || "Invalid credentials. Please try again.");
+        return;
       }
-      router.push(`/erp/${selectedRole}`);
-    }, 900);
+
+      const role = data.user?.app_metadata?.role as string | undefined;
+      const validRoles = ["admin", "faculty", "parent", "superadmin"];
+      if (!role || !validRoles.includes(role)) {
+        setError("Account is not configured. Please contact your administrator.");
+        return;
+      }
+
+      router.push(`/erp/${role}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

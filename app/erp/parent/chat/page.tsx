@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { Send, Bell, Search, CheckCheck } from "lucide-react";
 
@@ -62,7 +62,6 @@ const ANNOUNCEMENTS: Announcement[] = [
 ];
 
 export default function ParentChatPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [convos, setConvos] = useState<Conversation[]>(CONVOS);
   const [active, setActive] = useState<Conversation | null>(null);
@@ -71,10 +70,11 @@ export default function ParentChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   useEffect(() => {

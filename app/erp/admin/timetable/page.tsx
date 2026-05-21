@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { ChevronDown, ChevronUp, Save, Plus, Trash2 } from "lucide-react";
 
@@ -100,7 +100,6 @@ const INITIAL_TIMETABLES: ClassTimetable[] = [
 ];
 
 export default function AdminTimetablePage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [timetables, setTimetables] = useState<ClassTimetable[]>(INITIAL_TIMETABLES);
   const [activeClass, setActiveClass] = useState("JKG-A");
@@ -109,10 +108,11 @@ export default function AdminTimetablePage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "Admin");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   const current = timetables.find(t => t.classId === activeClass)!;

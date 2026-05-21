@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import {
   Search, Users, CheckCircle, XCircle, Clock,
@@ -117,7 +117,6 @@ function fmt(d: string) {
 }
 
 export default function AdminStaffPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [staff, setStaff] = useState<StaffMember[]>(STAFF_DATA);
   const [search, setSearch] = useState("");
@@ -127,10 +126,11 @@ export default function AdminStaffPage() {
   const [noteInput, setNoteInput] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "admin@smartneurons.in");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   const allPendingLeaves = useMemo(() =>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { Download, ChevronDown, ChevronUp, CheckCircle } from "lucide-react";
 
@@ -80,17 +80,17 @@ const SYLLABI: SubjectSyllabus[] = [
 ];
 
 export default function ParentSyllabusPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [term, setTerm] = useState<"Term 1" | "Term 2">("Term 1");
   const [expanded, setExpanded] = useState<string | null>("SS1");
   const [downloaded, setDownloaded] = useState<string | null>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   function handleDownload(id: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
@@ -12,15 +12,15 @@ const STUDENTS_GROWTH = [410, 430, 480, 590, 650, 720];
 function fmt(n: number) { return "₹" + (n / 1000).toFixed(0) + "k"; }
 
 export default function SuperAdminAnalyticsPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [period, setPeriod] = useState<"6m" | "1y">("6m");
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "superadmin") { router.replace("/erp/login"); return; }
-    setUser(u || "Super Admin");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Super Admin");
+    });
   }, []);
 
   const maxRevenue = Math.max(...REVENUE);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { Download, Award, TrendingUp, BookOpen, Star } from "lucide-react";
 
@@ -50,16 +50,16 @@ const ACHIEVEMENTS = [
 ];
 
 export default function ParentReportsPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [term, setTerm] = useState<"Term 1" | "Term 2">("Term 1");
   const [downloaded, setDownloaded] = useState(false);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   const subjects = term === "Term 1" ? TERM1 : TERM2;

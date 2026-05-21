@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -93,15 +93,15 @@ const SCHEDULE: Record<DayKey, Period[]> = {
 const TODAY_DAY = "Wednesday" as DayKey;
 
 export default function ParentTimetablePage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [activeDay, setActiveDay] = useState<DayKey>(TODAY_DAY);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   const periods = SCHEDULE[activeDay];

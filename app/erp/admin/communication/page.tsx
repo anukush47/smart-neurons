@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import {
   Bell, Send, Plus, X, Users, ChevronDown,
@@ -77,7 +77,6 @@ function fmt(d: string) {
 }
 
 export default function AdminCommunicationPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [tab, setTab] = useState<"announcements" | "inbox">("announcements");
   const [announcements, setAnnouncements] = useState<Announcement[]>(ANNOUNCEMENTS);
@@ -96,10 +95,11 @@ export default function AdminCommunicationPage() {
   const [drafts, setDrafts] = useState<Announcement[]>([]);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "admin@smartneurons.in");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   function saveDraft() {

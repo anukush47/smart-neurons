@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { CheckCircle, AlertTriangle, RefreshCw } from "lucide-react";
 
@@ -38,15 +38,15 @@ const INCIDENTS = [
 ];
 
 export default function SuperAdminHealthPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "superadmin") { router.replace("/erp/login"); return; }
-    setUser(u || "Super Admin");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Super Admin");
+    });
   }, []);
 
   function handleRefresh() {

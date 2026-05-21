@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { BookOpen, CheckCircle, AlertCircle, Users, ChevronDown, ChevronUp, Search } from "lucide-react";
 
@@ -42,17 +42,17 @@ const ALL_HW: HWSummary[] = [
 const CLASSES = ["All", "Playgroup-A", "Nursery-A", "Nursery-B", "JKG-A", "JKG-B", "SKG-A"];
 
 export default function AdminHomeworkPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("All");
   const [expanded, setExpanded] = useState<number | null>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "admin@smartneurons.in");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   const filtered = ALL_HW.filter(h => {

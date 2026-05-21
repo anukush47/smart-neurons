@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { Building2, Users, GraduationCap, Activity, CheckCircle, AlertCircle, TrendingUp, Server } from "lucide-react";
 
@@ -28,15 +28,15 @@ const schools = [
 ];
 
 export default function SuperAdminDashboard() {
-  const router = useRouter();
   const [user, setUser] = useState("");
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "superadmin") { router.replace("/erp/login"); return; }
-    setUser(u || "superadmin@smartneurons.in");
-  }, [router]);
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Super Admin");
+    });
+  }, []);
 
   return (
     <ERPShell role="superadmin" userName={user}>

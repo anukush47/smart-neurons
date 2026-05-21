@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Users, GraduationCap, CalendarDays, ClipboardList,
   CreditCard, Bell, MessageSquare, Image as ImageIcon, BarChart2,
@@ -71,31 +72,19 @@ const roleConfig: Record<Role, { label: string; color: string; bg: string; emoji
   parent: { label: "Parent", color: "#d97706", bg: "rgba(255,217,61,0.12)", emoji: "👨‍👩‍👧" },
 };
 
-interface ERPShellProps {
+interface SidebarContentProps {
+  nav: NavItem[];
   role: Role;
+  pathname: string;
+  sidebarOpen: boolean;
+  onLinkClick?: () => void;
+  onLogout: () => void;
   userName?: string;
-  children: React.ReactNode;
 }
 
-export default function ERPShell({ role, userName, children }: ERPShellProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
+function SidebarContent({ nav, role, pathname, sidebarOpen, onLinkClick, onLogout, userName }: SidebarContentProps) {
   const config = roleConfig[role];
-  const navItems = navByRole[role];
-
-  useEffect(() => {
-    setMobileSidebarOpen(false);
-  }, [pathname]);
-
-  function handleLogout() {
-    sessionStorage.clear();
-    router.replace("/erp/login");
-  }
-
-  const SidebarContent = () => (
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div
@@ -125,12 +114,13 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-        {navItems.map((item) => {
+        {nav.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
               key={item.href}
               href={item.href}
+              onClick={onLinkClick}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group relative"
               style={{
                 background: active ? config.bg : "transparent",
@@ -204,7 +194,7 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
         <button
           type="button"
           aria-label="Sign Out"
-          onClick={handleLogout}
+          onClick={onLogout}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors duration-150 hover:bg-red-50"
           style={{
             color: "rgba(26,26,46,0.50)",
@@ -219,6 +209,33 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
       </div>
     </div>
   );
+}
+
+interface ERPShellProps {
+  role: Role;
+  userName?: string;
+  children: React.ReactNode;
+}
+
+export default function ERPShell({ role, userName, children }: ERPShellProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const config = roleConfig[role];
+  const navItems = navByRole[role];
+
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [pathname]);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error("Sign out error:", error.message);
+    router.replace("/erp/login");
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#F8F4F0" }}>
@@ -234,9 +251,17 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
           boxShadow: "4px 0 24px rgba(26,26,46,0.06)",
         }}
       >
-        <SidebarContent />
+        <SidebarContent
+          nav={navItems}
+          role={role}
+          pathname={pathname}
+          sidebarOpen={sidebarOpen}
+          onLogout={handleLogout}
+          userName={userName}
+        />
         {/* Collapse toggle */}
         <button
+          type="button"
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="absolute bottom-24 -right-3 w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-all duration-200 hover:scale-110"
           style={{
@@ -273,7 +298,15 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
           boxShadow: "8px 0 40px rgba(26,26,46,0.12)",
         }}
       >
-        <SidebarContent />
+        <SidebarContent
+          nav={navItems}
+          role={role}
+          pathname={pathname}
+          sidebarOpen={true}
+          onLinkClick={() => setMobileSidebarOpen(false)}
+          onLogout={handleLogout}
+          userName={userName}
+        />
       </aside>
 
       {/* Main */}
@@ -313,6 +346,7 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
           {/* Topbar actions */}
           <div className="flex items-center gap-2">
             <button
+              type="button"
               className="relative flex items-center justify-center w-9 h-9 rounded-xl transition-colors hover:bg-white"
               style={{ background: "rgba(26,26,46,0.05)" }}
             >

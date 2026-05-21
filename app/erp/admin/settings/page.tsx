@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { Save, CheckCircle, Bell, Lock, User, School, Palette, Globe } from "lucide-react";
 
@@ -21,7 +21,6 @@ const SECTIONS: SettingsSection[] = [
 ];
 
 export default function AdminSettingsPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [active, setActive] = useState("school");
   const [saved, setSaved] = useState<string | null>(null);
@@ -72,10 +71,11 @@ export default function AdminSettingsPage() {
   });
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "Admin");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   function handleSave(section: string) {

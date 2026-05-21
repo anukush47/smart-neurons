@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { Clock, CheckCircle, AlertCircle, BookOpen, Users, Camera, FileText, CheckSquare, ChevronRight } from "lucide-react";
 
@@ -26,10 +27,11 @@ export default function FacultyDashboard() {
   const routineStatus = { presence: true, workPlan: true, workDone: false };
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "faculty") { router.replace("/erp/login"); return; }
-    setUser(u || "faculty@smartneurons.in");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Faculty");
+    });
   }, []);
 
   const allDone = routineStatus.presence && routineStatus.workPlan && routineStatus.workDone;

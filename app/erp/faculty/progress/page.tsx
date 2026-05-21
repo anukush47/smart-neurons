@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { ChevronDown, ChevronUp, Save, CheckCircle } from "lucide-react";
 
@@ -97,17 +97,17 @@ const INITIAL_REPORTS: StudentReport[] = [
 ];
 
 export default function FacultyProgressPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [reports, setReports] = useState<StudentReport[]>(INITIAL_REPORTS);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [term, setTerm] = useState<"Term 1" | "Term 2">("Term 1");
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "faculty") { router.replace("/erp/login"); return; }
-    setUser(u || "Ms. Priya Sharma");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Faculty");
+    });
   }, []);
 
   function updateMarks(studentId: string, subjectIdx: number, value: string) {

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { ChevronDown, ChevronUp, TrendingUp, Users, Award, BookOpen } from "lucide-react";
 
@@ -119,7 +118,6 @@ const CLASSES = ["All", "Playgroup", "Nursery", "JKG", "SKG"];
 const TERMS = ["All", "Term 1", "Term 2"];
 
 export default function AdminReportsPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [classFilter, setClassFilter] = useState("All");
   const [termFilter, setTermFilter] = useState("Term 1");
@@ -127,10 +125,11 @@ export default function AdminReportsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "Admin");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   const filtered = useMemo(() => REPORTS.filter(r => {

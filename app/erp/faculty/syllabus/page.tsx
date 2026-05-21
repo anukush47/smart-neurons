@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { ChevronDown, ChevronUp, Upload, CheckCircle, Plus, Trash2, FileText, BookOpen } from "lucide-react";
 
@@ -83,7 +83,6 @@ const INITIAL: SubjectSyllabus[] = [
 ];
 
 export default function FacultySyllabusPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [syllabi, setSyllabi] = useState<SubjectSyllabus[]>(INITIAL);
   const [expanded, setExpanded] = useState<string | null>("SS1");
@@ -94,10 +93,11 @@ export default function FacultySyllabusPage() {
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "faculty") { router.replace("/erp/login"); return; }
-    setUser(u || "Ms. Priya Sharma");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Faculty");
+    });
   }, []);
 
   function toggleTopic(syllabusId: string, topicId: string) {

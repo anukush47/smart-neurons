@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { Upload, Trash2, Eye, Plus, X, CheckCircle } from "lucide-react";
 
@@ -91,11 +91,11 @@ const TAG_META: Record<string, { color: string; bg: string }> = {
 };
 
 export default function AdminGalleryPage() {
-  const router = useRouter();
   const [user, setUser]       = useState("");
   const [albums, setAlbums]   = useState<GalleryAlbum[]>(INITIAL_ALBUMS);
-  const [view, setView]       = useState<"grid" | "album">("grid");
-  const [openAlbum, setOpenAlbum] = useState<GalleryAlbum | null>(null);
+  const [view, setView]         = useState<"grid" | "album">("grid");
+  const [openAlbumId, setOpenAlbumId] = useState<string | null>(null);
+  const openAlbum = albums.find(a => a.id === openAlbumId) ?? null;
   const [lightbox, setLightbox]   = useState<GalleryPhoto | null>(null);
   const [showNew, setShowNew]     = useState(false);
   const [newTitle, setNewTitle]   = useState("");
@@ -106,22 +106,22 @@ export default function AdminGalleryPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u    = sessionStorage.getItem("erp_user");
-    if (role !== "admin") { router.replace("/erp/login"); return; }
-    setUser(u || "Admin");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Admin");
+    });
   }, []);
 
   function togglePublish(albumId: string) {
     setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, published: !a.published } : a));
-    if (openAlbum?.id === albumId) setOpenAlbum(a => a ? { ...a, published: !a.published } : a);
   }
 
   function deleteAlbum(albumId: string) {
     const album = albums.find(a => a.id === albumId);
     album?.photos.forEach(p => { if (p.url.startsWith("blob:")) URL.revokeObjectURL(p.url); });
     setAlbums(prev => prev.filter(a => a.id !== albumId));
-    if (openAlbum?.id === albumId) { setOpenAlbum(null); setView("grid"); }
+    if (openAlbumId === albumId) { setOpenAlbumId(null); setView("grid"); }
   }
 
   function createAlbum() {
@@ -148,7 +148,6 @@ export default function AdminGalleryPage() {
       date: "Today",
     }));
     setAlbums(prev => prev.map(a => a.id === albumId ? { ...a, photos: [...a.photos, ...newPhotos] } : a));
-    if (openAlbum?.id === albumId) setOpenAlbum(a => a ? { ...a, photos: [...a.photos, ...newPhotos] } : a);
     setUploaded(true);
     setTimeout(() => setUploaded(false), 2000);
   }
@@ -160,7 +159,6 @@ export default function AdminGalleryPage() {
     if (photo?.url.startsWith("blob:")) URL.revokeObjectURL(photo.url);
 
     setAlbums(prev => prev.map(a => a.id !== albumId ? a : { ...a, photos: a.photos.filter(p => p.id !== photoId) }));
-    if (openAlbum?.id === albumId) setOpenAlbum(a => a ? { ...a, photos: a.photos.filter(p => p.id !== photoId) } : a);
   }
 
   return (
@@ -249,7 +247,7 @@ export default function AdminGalleryPage() {
       {/* Album detail view */}
       {view === "album" && openAlbum ? (
         <div>
-          <button type="button" onClick={() => { setView("grid"); setOpenAlbum(null); }}
+          <button type="button" onClick={() => { setView("grid"); setOpenAlbumId(null); }}
             className="flex items-center gap-1.5 text-xs font-bold mb-4 px-3 py-2 rounded-xl"
             style={{ background: "rgba(26,26,46,0.06)", color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-nunito)" }}>
             ← All Albums
@@ -314,7 +312,7 @@ export default function AdminGalleryPage() {
           {albums.map(a => (
             <div key={a.id} className="glass-card overflow-hidden group cursor-pointer"
               style={{ border: a.published ? "1.5px solid rgba(107,203,119,0.20)" : "1.5px solid rgba(26,26,46,0.08)" }}
-              onClick={() => { setOpenAlbum(a); setView("album"); }}>
+              onClick={() => { setOpenAlbumId(a.id); setView("album"); }}>
               <div className="relative overflow-hidden" style={{ height: 160 }}>
                 <img src={a.cover} alt={a.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.45), transparent)" }} />

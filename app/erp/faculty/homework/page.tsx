@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import {
   Plus, BookOpen, CheckCircle, AlertCircle, Clock,
@@ -126,7 +126,6 @@ function isPast(dateStr: string) {
 }
 
 export default function FacultyHomeworkPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [homeworks, setHomeworks] = useState<Homework[]>(INITIAL_HW);
   const [expanded, setExpanded] = useState<number | null>(1);
@@ -134,10 +133,11 @@ export default function FacultyHomeworkPage() {
   const [newHW, setNewHW] = useState({ subject: "", title: "", description: "", class: "JKG-A", dueDate: "", type: "Drawing" as HWType });
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "faculty") { router.replace("/erp/login"); return; }
-    setUser(u || "Ms. Priya Sharma");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Faculty");
+    });
   }, []);
 
   function markReviewed(hwId: number, student: string, remarks: string) {

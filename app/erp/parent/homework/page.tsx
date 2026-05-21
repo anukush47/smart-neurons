@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { CheckCircle, AlertCircle, Clock, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -75,17 +75,17 @@ function daysUntil(dateStr: string) {
 }
 
 export default function ParentHomeworkPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [homeworks, setHomeworks] = useState<Homework[]>(INITIAL_HW);
   const [expanded, setExpanded] = useState<number | null>(1);
   const [tab, setTab] = useState<"all" | "pending" | "done">("all");
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   function markDone(id: number) {

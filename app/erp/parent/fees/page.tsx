@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { CreditCard, CheckCircle, Clock, Download, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 
@@ -13,6 +13,7 @@ interface Payment {
   mode: string;
   receipt: string;
   status: "paid" | "due" | "upcoming";
+  paidOn?: string;
 }
 
 const PAYMENTS_DATA: Payment[] = [
@@ -41,18 +42,19 @@ function fmt(n: number) {
 }
 
 export default function ParentFeesPage() {
-  const router = useRouter();
   const [user, setUser] = useState("");
   const [payments, setPayments] = useState(PAYMENTS_DATA);
   const [payStep, setPayStep] = useState<"idle" | "select" | "confirm" | "done">("idle");
   const [payMode, setPayMode] = useState("UPI");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [paidAmount, setPaidAmount] = useState(0);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("erp_role");
-    const u = sessionStorage.getItem("erp_user");
-    if (role !== "parent") { router.replace("/erp/login"); return; }
-    setUser(u || "+91 XXXXX XXXXX");
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
 
   const paidCount    = payments.filter(p => p.status === "paid").length;
@@ -244,12 +246,14 @@ export default function ParentFeesPage() {
                     Back
                   </button>
                   <button type="button" onClick={() => {
-                    setPayStep("done");
+                    const duePayment = payments.find(p => p.status === "due");
+                    setPaidAmount(duePayment?.amount ?? 20000);
                     setPayments(prev => {
                       const firstDue = prev.find(p => p.status === "due");
                       if (!firstDue) return prev;
                       return prev.map(p => p.id === firstDue.id ? { ...p, status: "paid" as const, paidOn: new Date().toLocaleDateString("en-IN") } : p);
                     });
+                    setPayStep("done");
                   }}
                     className="flex-1 py-2.5 rounded-2xl text-sm font-bold text-white"
                     style={{ background: "linear-gradient(135deg,#7c3aed,#a78bfa)", boxShadow: "0 4px 14px rgba(124,58,237,0.28)", fontFamily: "var(--font-nunito)" }}>
@@ -267,7 +271,7 @@ export default function ParentFeesPage() {
                 </div>
                 <h3 className="text-lg font-bold text-navy mb-1" style={{ fontFamily: "var(--font-nunito)" }}>Payment Successful!</h3>
                 <p className="text-sm mb-1" style={{ color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-inter)" }}>
-                  {fmt(payments.find(p => p.status === "due")?.amount ?? 20000)} paid via {payMode}
+                  {fmt(paidAmount)} paid via {payMode}
                 </p>
                 <p className="text-xs mb-5" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
                   Receipt RC-SN-0124 · {new Date().toLocaleDateString("en-IN")}
