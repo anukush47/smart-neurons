@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { ChevronLeft, ChevronRight, Calendar, TrendingUp, Award } from "lucide-react";
@@ -23,7 +23,7 @@ const STATUS_STYLE: Record<DayStatus, { bg: string; color: string; label: string
 };
 
 function buildMonthData(year: number, month: number): DayData[] {
-  const today = new Date(2026, 4, 20); // May 20, 2026 (current date in session)
+  const today = new Date();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const result: DayData[] = [];
 
@@ -68,31 +68,79 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function ParentAttendancePage() {
   const [user, setUser] = useState("");
-  const [viewYear, setViewYear] = useState(2026);
-  const [viewMonth, setViewMonth] = useState(4); // May
+  const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
+  const [liveAttendance, setLiveAttendance] = useState<{ date: string; status: string }[]>([]);
+  const [childName, setChildName] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUser(user.user_metadata?.name || "Parent");
-    });
+
+      try {
+        const res = await fetch("/api/attendance/my-child");
+        if (res.ok) {
+          const { attendance, student } = await res.json();
+          if (attendance.length > 0) setLiveAttendance(attendance);
+          if (student) setChildName(student.name);
+        }
+      } catch {
+        setFetchError("Could not load live attendance.");
+      }
+    })();
   }, []);
 
-  const monthData = buildMonthData(viewYear, viewMonth);
+  // Build calendar data: prefer live DB records over synthetic mock data
+  const calendarData = useMemo(() => {
+    const base = buildMonthData(viewYear, viewMonth);
+    if (liveAttendance.length === 0) return base;
+
+    // Create a lookup: "YYYY-MM-DD" → status
+    const liveMap = new Map(
+      liveAttendance.map(a => [a.date.split("T")[0], a.status as string])
+    );
+
+    return base.map(day => {
+      if (!day.date) return day; // empty calendar slot
+      const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(day.date).padStart(2, "0")}`;
+      const liveStatus = liveMap.get(dateStr);
+      if (!liveStatus) return day;
+      return {
+        ...day,
+        status: liveStatus === "present" ? "present"
+               : liveStatus === "absent" ? "absent"
+               : liveStatus === "late" ? "late"
+               : day.status,
+      } as DayData;
+    });
+  }, [liveAttendance, viewMonth, viewYear]);
 
   // First day of the month (0=Sun)
   const firstDow = new Date(viewYear, viewMonth, 1).getDay();
   // Blank cells before day 1
   const blanks = Array.from({ length: firstDow });
 
-  // Stats
-  const schoolDays = monthData.filter(d => !["weekend", "future", "none"].includes(d.status));
-  const present    = monthData.filter(d => d.status === "present").length;
-  const absent     = monthData.filter(d => d.status === "absent").length;
-  const late       = monthData.filter(d => d.status === "late").length;
-  const holidays   = monthData.filter(d => d.status === "holiday").length;
+  // Stats from calendar data (reflects live overrides when available)
+  const schoolDays = calendarData.filter(d => !["weekend", "future", "none"].includes(d.status));
+  const present    = calendarData.filter(d => d.status === "present").length;
+  const absent     = calendarData.filter(d => d.status === "absent").length;
+  const late       = calendarData.filter(d => d.status === "late").length;
+  const holidays   = calendarData.filter(d => d.status === "holiday").length;
   const pct = schoolDays.length > 0 ? Math.round(((present + late) / schoolDays.length) * 100) : 0;
+
+  // Live API data derived values
+  const livePresent = liveAttendance.filter(a => a.status === "present").length;
+  const liveAbsent = liveAttendance.filter(a => a.status === "absent").length;
+  const liveLate = liveAttendance.filter(a => a.status === "late").length;
+
+  // Use live counts in stats cards when live data is available
+  const displayPresent = liveAttendance.length > 0 ? livePresent : present;
+  const displayAbsent  = liveAttendance.length > 0 ? liveAbsent  : absent;
+  const displayLate    = liveAttendance.length > 0 ? liveLate    : late;
 
   // Year-to-date (Apr–May 2026 mock)
   const ytdData = [
@@ -105,7 +153,7 @@ export default function ParentAttendancePage() {
     else setViewMonth(m => m - 1);
   }
   function nextMonth() {
-    const today = new Date("2026-05-20");
+    const today = new Date();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
     if (viewYear === currentYear && viewMonth >= currentMonth) return;
@@ -113,15 +161,21 @@ export default function ParentAttendancePage() {
     else setViewMonth(m => m + 1);
   }
 
-  const _today = new Date("2026-05-20");
+  const _today = new Date();
   const isCurrentOrFuture = viewYear > _today.getFullYear() || (viewYear === _today.getFullYear() && viewMonth >= _today.getMonth());
 
   return (
     <ERPShell role="parent" userName={user}>
       {/* Page heading */}
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>
-          Aarav's Attendance
+        <h1 className="text-xl font-bold text-navy flex items-center flex-wrap gap-1" style={{ fontFamily: "var(--font-playfair)" }}>
+          {(childName ?? "Aarav")}&apos;s Attendance
+          {liveAttendance.length > 0 && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full ml-2"
+              style={{ background: "rgba(107,203,119,0.12)", color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>
+              Live Data
+            </span>
+          )}
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
           JKG-A · Academic Year 2026–27
@@ -182,9 +236,9 @@ export default function ParentAttendancePage() {
               ))}
 
               {/* Day cells */}
-              {monthData.map(day => {
+              {calendarData.map(day => {
                 const style = STATUS_STYLE[day.status];
-                const isToday = viewYear === 2026 && viewMonth === 4 && day.date === 20;
+                const isToday = viewYear === _today.getFullYear() && viewMonth === _today.getMonth() && day.date === _today.getDate();
                 return (
                   <div
                     key={day.date}
@@ -227,10 +281,10 @@ export default function ParentAttendancePage() {
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Present",   value: present,   color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
-                { label: "Absent",    value: absent,    color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
-                { label: "Late",      value: late,      color: "#d97706", bg: "rgba(255,217,61,0.12)"  },
-                { label: "Holidays",  value: holidays,  color: "#7c3aed", bg: "rgba(167,139,250,0.10)" },
+                { label: "Present",   value: displayPresent, color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
+                { label: "Absent",    value: displayAbsent,  color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
+                { label: "Late",      value: displayLate,    color: "#d97706", bg: "rgba(255,217,61,0.12)"  },
+                { label: "Holidays",  value: holidays,       color: "#7c3aed", bg: "rgba(167,139,250,0.10)" },
               ].map(s => (
                 <div key={s.label} className="p-3 rounded-2xl text-center" style={{ background: s.bg }}>
                   <p className="text-2xl font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>{s.value}</p>

@@ -5,6 +5,20 @@ import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { CreditCard, CheckCircle, Clock, Download, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
 
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise(resolve => {
+    if (typeof window !== "undefined" && (window as Window & { Razorpay?: unknown }).Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 interface Payment {
   id: string;
   description: string;
@@ -48,6 +62,18 @@ export default function ParentFeesPage() {
   const [payMode, setPayMode] = useState("UPI");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [paidAmount, setPaidAmount] = useState(0);
+  const [liveFees, setLiveFees] = useState<{
+    id: string;
+    amount_due: number;
+    status: "pending" | "paid" | "overdue";
+    due_date: string;
+    paid_at: string | null;
+    receipt_no: string | null;
+    fee_structures: { name: string; term: string };
+  }[]>([]);
+  const [childName, setChildName] = useState<string | null>(null);
+  const [payingFeeId, setPayingFeeId] = useState<string | null>(null);
+  const [verifiedReceipt, setVerifiedReceipt] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -55,10 +81,104 @@ export default function ParentFeesPage() {
       if (!user) return;
       setUser(user.user_metadata?.name || "Parent");
     });
+    fetch("/api/fees/my-child")
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(({ fees, student }: { fees?: typeof liveFees; student?: { name: string } | null }) => {
+        if (fees?.length) setLiveFees(fees);
+        if (student?.name) setChildName(student.name);
+      })
+      .catch(() => { /* silently keep mock data */ });
   }, []);
 
   const paidCount    = payments.filter(p => p.status === "paid").length;
   const pct = Math.round((PAID_AMT / ANNUAL_FEE) * 100);
+
+  async function handleRazorpayPayment() {
+    const duePayment = liveFees.length > 0
+      ? liveFees.find(f => f.status === "pending" || f.status === "overdue")
+      : payments.find(p => p.status === "due");
+    if (!duePayment) return;
+
+    const amount = liveFees.length > 0
+      ? (duePayment as typeof liveFees[0]).amount_due
+      : (duePayment as typeof payments[0]).amount;
+
+    setPaidAmount(amount);
+
+    if (liveFees.length > 0) {
+      setPayingFeeId((duePayment as typeof liveFees[0]).id);
+      const loaded = await loadRazorpayScript();
+      if (!loaded) {
+        alert("Failed to load Razorpay. Please try again.");
+        return;
+      }
+      const res = await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fee_payment_id: (duePayment as typeof liveFees[0]).id, amount }),
+      });
+      if (!res.ok) {
+        alert("Could not create payment order. Please try again.");
+        setPayingFeeId(null);
+        return;
+      }
+      const orderData = await res.json() as { order_id: string; amount: number; currency: string; key: string };
+
+      const options = {
+        key: orderData.key,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Smart Neurons ERP",
+        description: "School Fee Payment",
+        order_id: orderData.order_id,
+        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+          const verifyRes = await fetch("/api/payments/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              fee_payment_id: (duePayment as typeof liveFees[0]).id,
+            }),
+          });
+          if (verifyRes.ok) {
+            const { receipt_no } = await verifyRes.json() as { receipt_no?: string };
+            setVerifiedReceipt(receipt_no ?? null);
+            setLiveFees(prev => prev.map(f =>
+              f.id === (duePayment as typeof liveFees[0]).id
+                ? { ...f, status: "paid" as const, paid_at: new Date().toISOString() }
+                : f
+            ));
+            setPayStep("done");
+          } else {
+            const { error } = await verifyRes.json().catch(() => ({ error: "Verification failed" }));
+            alert(`Payment recorded by Razorpay but verification failed: ${error}. Please contact support with your payment ID: ${response.razorpay_payment_id}`);
+          }
+          setPayingFeeId(null);
+        },
+        prefill: { name: childName || "Parent" },
+        theme: { color: "#1A1A2E" },
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rzp = new ((window as unknown as Record<string, any>).Razorpay)(options);
+      rzp.open();
+    } else {
+      setPayingFeeId("mock");
+      setPayments(prev =>
+        prev.map(p => p.id === (duePayment as typeof payments[0]).id
+          ? { ...p, status: "paid" as const, paidOn: new Date().toLocaleDateString("en-IN") }
+          : p
+        )
+      );
+      setPayStep("done");
+      setPayingFeeId(null);
+    }
+  }
 
   return (
     <ERPShell role="parent" userName={user}>
@@ -118,6 +238,42 @@ export default function ParentFeesPage() {
           <span>{fmt(ANNUAL_FEE - PAID_AMT)} remaining</span>
         </div>
       </div>
+
+      {/* Live fee account rows */}
+      {liveFees.length > 0 && (
+        <div className="glass-card p-5 mb-4">
+          <p className="text-sm font-bold text-navy mb-3" style={{ fontFamily: "var(--font-nunito)" }}>
+            Fee Account — {childName ?? "Your Child"} ({new Date().getFullYear()}-{String(new Date().getFullYear() + 1).slice(-2)})
+          </p>
+          <div className="space-y-2">
+            {liveFees.map(f => (
+              <div key={f.id} className="flex items-center justify-between px-4 py-3 rounded-xl"
+                style={{ background: "rgba(26,26,46,0.03)", border: "1px solid rgba(26,26,46,0.06)" }}>
+                <div>
+                  <p className="text-sm font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{f.fee_structures.name}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
+                    Due: {new Date(f.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    {f.receipt_no && ` · ${f.receipt_no}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold" style={{ color: "#1A1A2E", fontFamily: "var(--font-nunito)" }}>
+                    ₹{f.amount_due.toLocaleString("en-IN")}
+                  </span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                    style={{
+                      background: f.status === "paid" ? "rgba(107,203,119,0.12)" : f.status === "overdue" ? "rgba(255,107,107,0.12)" : "rgba(217,119,6,0.10)",
+                      color: f.status === "paid" ? "#6BCB77" : f.status === "overdue" ? "#FF6B6B" : "#d97706",
+                      fontFamily: "var(--font-nunito)"
+                    }}>
+                    {f.status === "paid" ? "Paid" : f.status === "overdue" ? "Overdue" : "Due"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Payment schedule */}
       <div className="glass-card p-5 mb-5">
@@ -245,18 +401,9 @@ export default function ParentFeesPage() {
                     style={{ background: "rgba(26,26,46,0.06)", color: "rgba(26,26,46,0.60)", fontFamily: "var(--font-nunito)" }}>
                     Back
                   </button>
-                  <button type="button" onClick={() => {
-                    const duePayment = payments.find(p => p.status === "due");
-                    setPaidAmount(duePayment?.amount ?? 20000);
-                    setPayments(prev => {
-                      const firstDue = prev.find(p => p.status === "due");
-                      if (!firstDue) return prev;
-                      return prev.map(p => p.id === firstDue.id ? { ...p, status: "paid" as const, paidOn: new Date().toLocaleDateString("en-IN") } : p);
-                    });
-                    setPayStep("done");
-                  }}
+                  <button type="button" onClick={handleRazorpayPayment} disabled={!!payingFeeId}
                     className="flex-1 py-2.5 rounded-2xl text-sm font-bold text-white"
-                    style={{ background: "linear-gradient(135deg,#7c3aed,#a78bfa)", boxShadow: "0 4px 14px rgba(124,58,237,0.28)", fontFamily: "var(--font-nunito)" }}>
+                    style={{ background: "linear-gradient(135deg,#7c3aed,#a78bfa)", boxShadow: "0 4px 14px rgba(124,58,237,0.28)", fontFamily: "var(--font-nunito)", opacity: payingFeeId ? 0.6 : 1 }}>
                     Pay {fmt(payments.find(p => p.status === "due")?.amount ?? 20000)}
                   </button>
                 </div>
@@ -274,7 +421,7 @@ export default function ParentFeesPage() {
                   {fmt(paidAmount)} paid via {payMode}
                 </p>
                 <p className="text-xs mb-5" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
-                  Receipt RC-SN-0124 · {new Date().toLocaleDateString("en-IN")}
+                  Receipt {verifiedReceipt ?? "RC-SN-0124"} · {new Date().toLocaleDateString("en-IN")}
                 </p>
                 <button type="button" onClick={() => setPayStep("idle")}
                   className="w-full py-2.5 rounded-2xl text-sm font-bold text-white"

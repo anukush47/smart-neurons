@@ -83,6 +83,15 @@ export default function AdminFeesPage() {
   const [collectAmount, setCollectAmount] = useState("");
   const [collectMode, setCollectMode] = useState<PayMode>("Cash");
   const [records, setRecords] = useState<FeeRecord[]>(FEE_DATA);
+  const [liveFeeSummary, setLiveFeeSummary] = useState<{
+    id: string;
+    amount_due: number;
+    amount_paid: number;
+    status: string;
+    students: { name: string; class: string; section: string };
+    fee_structures: { name: string; term: string };
+  }[]>([]);
+  const [loadingFees, setLoadingFees] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -90,6 +99,21 @@ export default function AdminFeesPage() {
       if (!user) return;
       setUser(user.user_metadata?.name || "Admin");
     });
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      setLoadingFees(true);
+      try {
+        const res = await fetch("/api/fees");
+        if (res.ok) {
+          const { fees } = await res.json();
+          setLiveFeeSummary(fees ?? []);
+        }
+      } finally {
+        setLoadingFees(false);
+      }
+    })();
   }, []);
 
   const filtered = useMemo(() => {
@@ -165,6 +189,55 @@ export default function AdminFeesPage() {
           </div>
         ))}
       </div>
+
+      {/* Live fee collection */}
+      {liveFeeSummary.length > 0 && (
+        <div className="glass-card p-5 mb-4">
+          <p className="text-sm font-bold text-navy mb-3" style={{ fontFamily: "var(--font-nunito)" }}>
+            Live Fee Collection — AY 2026-27
+          </p>
+          {loadingFees && <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)" }}>Loading…</p>}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {(() => {
+              const paid = liveFeeSummary.filter(f => f.status === "paid");
+              const pending = liveFeeSummary.filter(f => f.status === "pending" || f.status === "overdue");
+              const totalCollected = paid.reduce((s, f) => s + Number(f.amount_paid), 0);
+              const totalDue = pending.reduce((s, f) => s + Number(f.amount_due), 0);
+              return [
+                { label: "Collected",      value: `₹${totalCollected.toLocaleString("en-IN")}`, color: "#6BCB77" },
+                { label: "Pending",        value: `₹${totalDue.toLocaleString("en-IN")}`,       color: "#FF6B6B" },
+                { label: "Total Records",  value: String(liveFeeSummary.length),                color: "#1A1A2E" },
+              ].map(c => (
+                <div key={c.label} className="rounded-xl p-3 text-center" style={{ background: "rgba(26,26,46,0.04)" }}>
+                  <p className="text-lg font-bold" style={{ color: c.color, fontFamily: "var(--font-nunito)" }}>{c.value}</p>
+                  <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>{c.label}</p>
+                </div>
+              ));
+            })()}
+          </div>
+          <div className="space-y-1.5 max-h-60 overflow-y-auto">
+            {liveFeeSummary.slice(0, 20).map(f => (
+              <div key={f.id} className="flex items-center justify-between px-3 py-2 rounded-lg"
+                style={{ background: "rgba(26,26,46,0.03)" }}>
+                <div>
+                  <p className="text-xs font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{f.students.name}</p>
+                  <p className="text-xs" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>
+                    {f.students.class}-{f.students.section} · {f.fee_structures.name}
+                  </p>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{
+                    background: f.status === "paid" ? "rgba(107,203,119,0.12)" : "rgba(255,107,107,0.10)",
+                    color: f.status === "paid" ? "#6BCB77" : "#FF6B6B",
+                    fontFamily: "var(--font-nunito)"
+                  }}>
+                  {f.status === "paid" ? "Paid" : "Due"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Collection progress + monthly trend */}
       <div className="grid lg:grid-cols-3 gap-5 mb-6">

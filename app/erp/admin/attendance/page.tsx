@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ERPShell from "@/components/erp/ERPShell";
 import { CheckCircle, XCircle, Clock, AlertCircle, Download, Users, ChevronDown, Search } from "lucide-react";
 
@@ -130,6 +130,42 @@ export default function AdminAttendancePage() {
   const [students, setStudents] = useState<Record<string, Student[]>>(allStudents);
   const [search, setSearch] = useState("");
   const [saved, setSaved] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [liveData, setLiveData] = useState<{ student_id: string; status: string; students: { name: string; class: string; section: string } }[]>([]);
+
+  async function fetchAttendance(date: string) {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/attendance?date=${date}`);
+      if (res.ok) {
+        const { attendance } = await res.json();
+        setLiveData(attendance);
+        // Merge live DB statuses into displayed students
+        setStudents(prev => {
+          const updated = { ...prev };
+          for (const [cls, list] of Object.entries(updated)) {
+            updated[cls] = list.map(s => {
+              const match = attendance.find(
+                (a: { students?: { name?: string }; status: string }) =>
+                  a.students?.name === s.name
+              );
+              if (match) {
+                return { ...s, status: match.status as typeof s.status };
+              }
+              return s;
+            });
+          }
+          return updated;
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { fetchAttendance(selectedDate); }, [selectedDate]);
 
   const classInfo = classOptions.find(c => c.id === selectedClass)!;
   const list = (students[selectedClass] || []).filter(s =>
@@ -160,6 +196,35 @@ export default function AdminAttendancePage() {
     }));
   };
 
+  async function handleSaveAttendance() {
+    const classStudents = students[selectedClass] ?? [];
+    if (classStudents.length === 0) return;
+    setSaving(true);
+    try {
+      await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: selectedDate,
+          class: selectedClass,
+          records: classStudents
+            .filter(s => s.status !== ("—" as string) && s.status !== ("-" as string))
+            .map(s => ({
+              student_id: String(s.id),
+              status: s.status === "present" ? "present"
+                     : s.status === "absent" ? "absent"
+                     : s.status === "late" ? "late"
+                     : "present",
+            })),
+        }),
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <ERPShell role="admin" userName="admin@smartneurons.in">
       {/* Header */}
@@ -172,7 +237,10 @@ export default function AdminAttendancePage() {
             {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
+          <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+            className="px-3 py-2 rounded-xl text-sm"
+            style={{ background: "rgba(26,26,46,0.04)", border: "1px solid rgba(26,26,46,0.09)", outline: "none", fontFamily: "var(--font-inter)", color: "rgba(26,26,46,0.80)" }} />
           <button
             type="button"
             className="flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-full transition-all duration-200 hover:-translate-y-0.5"
@@ -182,11 +250,12 @@ export default function AdminAttendancePage() {
           </button>
           <button
             type="button"
-            onClick={() => setSaved(true)}
-            className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full text-white transition-all duration-200 hover:-translate-y-0.5"
+            onClick={handleSaveAttendance}
+            disabled={saving}
+            className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ fontFamily: "var(--font-nunito)", background: saved ? "#6BCB77" : "linear-gradient(135deg,#FF6B6B,#ff8e53)", boxShadow: "0 4px 14px rgba(255,107,107,0.30)" }}
           >
-            {saved ? <><CheckCircle size={13} /> Saved</> : "Save Attendance"}
+            {saved ? <><CheckCircle size={13} /> Saved</> : saving ? "Saving…" : "Save Attendance"}
           </button>
         </div>
       </div>
@@ -194,7 +263,7 @@ export default function AdminAttendancePage() {
       {/* Class tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 mb-5 scrollbar-hide">
         {classOptions.map(c => {
-          const st = allStudents[c.id] ?? [];
+          const st = students[c.id] ?? [];
           const absCnt = st.filter(s => s.status === "absent").length;
           return (
             <button
@@ -240,6 +309,33 @@ export default function AdminAttendancePage() {
           </div>
         ))}
       </div>
+
+      {liveData.length > 0 && (
+        <div className="glass-card p-4 mb-4">
+          <p className="text-sm font-bold text-navy mb-2" style={{ fontFamily: "var(--font-nunito)" }}>
+            Live — {new Date(selectedDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+          </p>
+          <div className="flex gap-4 flex-wrap">
+            {["present","absent","late"].map(s => {
+              const count = liveData.filter(r => r.status === s).length;
+              const colors: Record<string, string> = { present: "#6BCB77", absent: "#FF6B6B", late: "#d97706" };
+              return (
+                <div key={s} className="text-center">
+                  <p className="text-xl font-bold" style={{ color: colors[s], fontFamily: "var(--font-nunito)" }}>{count}</p>
+                  <p className="text-xs capitalize" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>{s}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(124,58,237,0.30)", borderTopColor: "#7c3aed" }} />
+          <span className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>Loading attendance…</span>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Student list */}
