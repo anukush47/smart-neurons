@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Users, GraduationCap, CalendarDays, ClipboardList,
   CreditCard, Bell, MessageSquare, Image as ImageIcon, BarChart2,
   Settings, LogOut, Menu, X, ChevronRight, BookOpen, FileText,
-  Clock, Award, Home, Building2, Activity, Shield,
+  Clock, Award, Home, Building2, Activity, Shield, UserCircle,
 } from "lucide-react";
 
 type Role = "superadmin" | "admin" | "faculty" | "parent";
@@ -23,45 +23,49 @@ interface NavItem {
 
 const navByRole: Record<Role, NavItem[]> = {
   superadmin: [
-    { href: "/erp/superadmin", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
-    { href: "/erp/superadmin/schools", label: "Schools", icon: <Building2 size={18} /> },
-    { href: "/erp/superadmin/analytics", label: "Analytics", icon: <BarChart2 size={18} /> },
-    { href: "/erp/superadmin/health", label: "System Health", icon: <Activity size={18} /> },
-    { href: "/erp/superadmin/settings", label: "Settings", icon: <Settings size={18} /> },
+    { href: "/erp/superadmin",          label: "Dashboard",    icon: <LayoutDashboard size={18} /> },
+    { href: "/erp/superadmin/schools",  label: "Schools",      icon: <Building2 size={18} /> },
+    { href: "/erp/superadmin/analytics",label: "Analytics",    icon: <BarChart2 size={18} /> },
+    { href: "/erp/superadmin/health",   label: "System Health",icon: <Activity size={18} /> },
+    { href: "/erp/superadmin/settings", label: "Settings",     icon: <Settings size={18} /> },
+    { href: "/erp/superadmin/profile",  label: "My Profile",   icon: <UserCircle size={18} /> },
   ],
   admin: [
-    { href: "/erp/admin", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
-    { href: "/erp/admin/students", label: "Students", icon: <Users size={18} /> },
-    { href: "/erp/admin/staff", label: "Staff & Leave", icon: <GraduationCap size={18} /> },
-    { href: "/erp/admin/timetable", label: "Timetable", icon: <CalendarDays size={18} /> },
-    { href: "/erp/admin/attendance", label: "Attendance", icon: <ClipboardList size={18} /> },
-    { href: "/erp/admin/fees", label: "Fee Management", icon: <CreditCard size={18} />, badge: "2" },
-    { href: "/erp/admin/communication", label: "Communication", icon: <Bell size={18} /> },
-    { href: "/erp/admin/gallery", label: "Gallery", icon: <ImageIcon size={18} /> },
-    { href: "/erp/admin/reports", label: "Reports", icon: <BarChart2 size={18} /> },
-    { href: "/erp/admin/settings", label: "Settings", icon: <Settings size={18} /> },
+    { href: "/erp/admin",              label: "Dashboard",    icon: <LayoutDashboard size={18} /> },
+    { href: "/erp/admin/students",     label: "Students",     icon: <Users size={18} /> },
+    { href: "/erp/admin/staff",        label: "Staff & Leave",icon: <GraduationCap size={18} /> },
+    { href: "/erp/admin/timetable",    label: "Timetable",    icon: <CalendarDays size={18} /> },
+    { href: "/erp/admin/attendance",   label: "Attendance",   icon: <ClipboardList size={18} /> },
+    { href: "/erp/admin/fees",         label: "Fee Management",icon: <CreditCard size={18} />, badge: "2" },
+    { href: "/erp/admin/communication",label: "Communication",icon: <Bell size={18} /> },
+    { href: "/erp/admin/gallery",      label: "Gallery",      icon: <ImageIcon size={18} /> },
+    { href: "/erp/admin/reports",      label: "Reports",      icon: <BarChart2 size={18} /> },
+    { href: "/erp/admin/settings",     label: "Settings",     icon: <Settings size={18} /> },
+    { href: "/erp/admin/profile",      label: "My Profile",   icon: <UserCircle size={18} /> },
   ],
   faculty: [
-    { href: "/erp/faculty", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
-    { href: "/erp/faculty/routine", label: "Daily Routine", icon: <Clock size={18} />, badge: "!" },
-    { href: "/erp/faculty/attendance", label: "My Classes", icon: <ClipboardList size={18} /> },
-    { href: "/erp/faculty/homework", label: "Homework", icon: <BookOpen size={18} />, badge: "4" },
-    { href: "/erp/faculty/syllabus", label: "Syllabus", icon: <FileText size={18} /> },
-    { href: "/erp/faculty/progress", label: "Progress Reports", icon: <Award size={18} /> },
-    { href: "/erp/faculty/leave", label: "Leave", icon: <CalendarDays size={18} /> },
-    { href: "/erp/faculty/chat", label: "Messages", icon: <MessageSquare size={18} />, badge: "3" },
-    { href: "/erp/faculty/gallery", label: "Gallery", icon: <ImageIcon size={18} /> },
+    { href: "/erp/faculty",            label: "Dashboard",       icon: <LayoutDashboard size={18} /> },
+    { href: "/erp/faculty/routine",    label: "Daily Routine",   icon: <Clock size={18} />, badge: "!" },
+    { href: "/erp/faculty/attendance", label: "My Classes",      icon: <ClipboardList size={18} /> },
+    { href: "/erp/faculty/homework",   label: "Homework",        icon: <BookOpen size={18} />, badge: "4" },
+    { href: "/erp/faculty/syllabus",   label: "Syllabus",        icon: <FileText size={18} /> },
+    { href: "/erp/faculty/progress",   label: "Progress Reports",icon: <Award size={18} /> },
+    { href: "/erp/faculty/leave",      label: "Leave",           icon: <CalendarDays size={18} /> },
+    { href: "/erp/faculty/chat",       label: "Messages",        icon: <MessageSquare size={18} />, badge: "3" },
+    { href: "/erp/faculty/gallery",    label: "Gallery",         icon: <ImageIcon size={18} /> },
+    { href: "/erp/faculty/profile",    label: "My Profile",      icon: <UserCircle size={18} /> },
   ],
   parent: [
-    { href: "/erp/parent", label: "Dashboard", icon: <Home size={18} /> },
-    { href: "/erp/parent/attendance", label: "Attendance", icon: <ClipboardList size={18} /> },
-    { href: "/erp/parent/homework", label: "Homework", icon: <BookOpen size={18} />, badge: "2" },
-    { href: "/erp/parent/syllabus", label: "Syllabus", icon: <FileText size={18} /> },
-    { href: "/erp/parent/reports", label: "Progress Reports", icon: <Award size={18} /> },
-    { href: "/erp/parent/fees", label: "Fees", icon: <CreditCard size={18} />, badge: "Due" },
-    { href: "/erp/parent/timetable", label: "Timetable", icon: <CalendarDays size={18} /> },
-    { href: "/erp/parent/gallery", label: "Gallery", icon: <ImageIcon size={18} /> },
-    { href: "/erp/parent/chat", label: "Messages", icon: <MessageSquare size={18} /> },
+    { href: "/erp/parent",            label: "Dashboard",       icon: <Home size={18} /> },
+    { href: "/erp/parent/attendance", label: "Attendance",      icon: <ClipboardList size={18} /> },
+    { href: "/erp/parent/homework",   label: "Homework",        icon: <BookOpen size={18} />, badge: "2" },
+    { href: "/erp/parent/syllabus",   label: "Syllabus",        icon: <FileText size={18} /> },
+    { href: "/erp/parent/reports",    label: "Progress Reports",icon: <Award size={18} /> },
+    { href: "/erp/parent/fees",       label: "Fees",            icon: <CreditCard size={18} />, badge: "Due" },
+    { href: "/erp/parent/timetable",  label: "Timetable",       icon: <CalendarDays size={18} /> },
+    { href: "/erp/parent/gallery",    label: "Gallery",         icon: <ImageIcon size={18} /> },
+    { href: "/erp/parent/chat",       label: "Messages",        icon: <MessageSquare size={18} /> },
+    { href: "/erp/parent/profile",    label: "My Profile",      icon: <UserCircle size={18} /> },
   ],
 };
 
@@ -357,8 +361,9 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
               />
             </button>
 
-            <div
-              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl cursor-pointer"
+            <Link
+              href={`/erp/${role}/profile`}
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-opacity hover:opacity-80"
               style={{ background: config.bg }}
             >
               <div
@@ -373,7 +378,7 @@ export default function ERPShell({ role, userName, children }: ERPShellProps) {
               >
                 {userName ? userName.split("@")[0] : config.label}
               </span>
-            </div>
+            </Link>
           </div>
         </header>
 
