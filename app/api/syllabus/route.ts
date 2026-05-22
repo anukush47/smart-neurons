@@ -30,8 +30,10 @@ export async function GET(request: Request) {
   let query = admin.from("syllabus").select("*").order("subject");
 
   if (role === "faculty") {
-    const [cls, sec] = parseClass(user.app_metadata?.class_assigned ?? "");
-    if (cls) query = query.eq("class", cls).eq("section", sec);
+    const classAssigned = user.app_metadata?.class_assigned ?? "";
+    if (!classAssigned) return NextResponse.json({ syllabus: [] });
+    const [cls, sec] = parseClass(classAssigned);
+    query = query.eq("class", cls).eq("section", sec);
   } else if (classFilter && classFilter !== "All") {
     query = query.eq("class", classFilter);
   }

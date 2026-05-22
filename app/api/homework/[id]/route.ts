@@ -29,6 +29,19 @@ export async function PATCH(
   }
 
   const admin = createAdminClient();
+
+  if (role === "parent") {
+    const { data: student } = await admin
+      .from("students").select("id").eq("parent_user_id", user.id).single();
+    if (!student) return NextResponse.json({ error: "Student not found" }, { status: 403 });
+
+    const { data: sub } = await admin
+      .from("homework_submissions").select("student_id").eq("id", submission_id).single();
+    if (!sub || sub.student_id !== student.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  }
+
   const update: Record<string, unknown> = { status };
   if (status === "submitted") update.submitted_at = new Date().toISOString();
   if (status === "reviewed" && remarks) update.remarks = remarks;

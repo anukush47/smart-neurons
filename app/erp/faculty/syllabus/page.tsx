@@ -30,17 +30,25 @@ export default function FacultySyllabusPage() {
   const [syllabi, setSyllabi] = useState<Syllabus[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [term, setTerm] = useState<"Term 1" | "Term 2">("Term 1");
+  const [loading, setLoading] = useState(true);
   const [showAddTopic, setShowAddTopic] = useState<string | null>(null);
   const [newTopicTitle, setNewTopicTitle] = useState("");
   const [newTopicWeek, setNewTopicWeek] = useState("");
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const noteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const loadSyllabus = useCallback(async (t: string) => {
-    const res = await fetch(`/api/syllabus?term=${encodeURIComponent(t)}`);
-    const data = await res.json();
-    if (data.syllabus) {
-      setSyllabi(data.syllabus as Syllabus[]);
-      if ((data.syllabus as Syllabus[]).length > 0) setExpanded((data.syllabus as Syllabus[])[0].id);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/syllabus?term=${encodeURIComponent(t)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.syllabus) {
+        setSyllabi(data.syllabus as Syllabus[]);
+        if ((data.syllabus as Syllabus[]).length > 0) setExpanded((data.syllabus as Syllabus[])[0].id);
+      }
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -93,9 +101,12 @@ export default function FacultySyllabusPage() {
     await patchSyllabus(syllabusId, { topics: newTopics });
   }
 
-  async function updateNote(syllabusId: string, note: string) {
+  function updateNote(syllabusId: string, note: string) {
     setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, note }));
-    await patchSyllabus(syllabusId, { note });
+    clearTimeout(noteTimers.current[syllabusId]);
+    noteTimers.current[syllabusId] = setTimeout(() => {
+      patchSyllabus(syllabusId, { note });
+    }, 800);
   }
 
   function handleFileChange(syllabusId: string, e: React.ChangeEvent<HTMLInputElement>) {
@@ -134,7 +145,13 @@ export default function FacultySyllabusPage() {
         ))}
       </div>
 
-      {filtered.length === 0 && (
+      {loading && (
+        <div className="glass-card p-10 text-center">
+          <p className="text-sm" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>Loading syllabus…</p>
+        </div>
+      )}
+
+      {!loading && filtered.length === 0 && (
         <div className="glass-card p-10 text-center">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
             style={{ background: "rgba(107,203,119,0.10)" }}>

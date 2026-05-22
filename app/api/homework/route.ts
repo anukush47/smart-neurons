@@ -32,8 +32,10 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
 
   if (role === "faculty") {
-    const [cls, sec] = parseClass(user.app_metadata?.class_assigned ?? "");
-    if (cls) query = query.eq("class", cls).eq("section", sec);
+    const classAssigned = user.app_metadata?.class_assigned ?? "";
+    if (!classAssigned) return NextResponse.json({ homework: [] });
+    const [cls, sec] = parseClass(classAssigned);
+    query = query.eq("class", cls).eq("section", sec);
   } else if (classFilter && classFilter !== "All") {
     query = query.eq("class", classFilter);
   }
@@ -60,6 +62,14 @@ export async function POST(request: Request) {
   }
 
   const sec = section || "A";
+
+  // Faculty can only create homework for their own assigned class
+  if (role === "faculty") {
+    const [assignedCls, assignedSec] = parseClass(user.app_metadata?.class_assigned ?? "");
+    if (cls !== assignedCls || sec !== assignedSec) {
+      return NextResponse.json({ error: "Forbidden: can only assign homework to your own class" }, { status: 403 });
+    }
+  }
   const admin = createAdminClient();
 
   const { data: hw, error: hwErr } = await admin

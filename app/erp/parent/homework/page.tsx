@@ -184,15 +184,21 @@ export default function ParentHomeworkPage() {
                     </div>
                   )}
 
-                  {hw.status === "pending" && hw.submission_id && (
-                    <button type="button"
-                      onClick={() => markDone(hw)}
-                      disabled={marking === hw.id}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-60"
-                      style={{ background: "linear-gradient(135deg,#d97706,#fbbf24)", boxShadow: "0 4px 14px rgba(217,119,6,0.25)", fontFamily: "var(--font-nunito)" }}>
-                      <CheckCircle size={14} />
-                      {marking === hw.id ? "Marking…" : "Mark as Done"}
-                    </button>
+                  {hw.status === "pending" && (
+                    hw.submission_id ? (
+                      <button type="button"
+                        onClick={() => markDone(hw)}
+                        disabled={marking === hw.id}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-60"
+                        style={{ background: "linear-gradient(135deg,#d97706,#fbbf24)", boxShadow: "0 4px 14px rgba(217,119,6,0.25)", fontFamily: "var(--font-nunito)" }}>
+                        <CheckCircle size={14} />
+                        {marking === hw.id ? "Marking…" : "Mark as Done"}
+                      </button>
+                    ) : (
+                      <p className="text-xs" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>
+                        Complete in class · contact teacher to update status
+                      </p>
+                    )
                   )}
                 </div>
               )}

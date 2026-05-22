@@ -74,19 +74,26 @@ export default function FacultyHomeworkPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [newHW, setNewHW] = useState({
     subject: "", title: "", description: "", dueDate: "", type: "Drawing" as HWType,
   });
 
   const loadHomework = useCallback(async () => {
-    const res = await fetch("/api/homework");
-    const data = await res.json();
-    if (data.homework) {
-      const mapped = (data.homework as Record<string, unknown>[]).map(mapHW);
-      setHomeworks(mapped);
-      if (mapped.length > 0 && !expanded) setExpanded(mapped[0].id);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/homework");
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.homework) {
+        const mapped = (data.homework as Record<string, unknown>[]).map(mapHW);
+        setHomeworks(mapped);
+        if (mapped.length > 0) setExpanded(prev => prev ?? mapped[0].id);
+      }
+    } finally {
+      setLoading(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const sb = createClient();
@@ -117,21 +124,24 @@ export default function FacultyHomeworkPage() {
   async function assignHomework() {
     if (!newHW.subject || !newHW.title || !newHW.dueDate) return;
     setSaving(true);
+    try {
     const lastDash = classAssigned.lastIndexOf("-");
     const sec = lastDash !== -1 ? classAssigned.slice(lastDash + 1) : "A";
     const cls = lastDash !== -1 ? classAssigned.slice(0, lastDash) : classAssigned;
 
-    const res = await fetch("/api/homework", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newHW, due_date: newHW.dueDate, class: cls, section: sec }),
-    });
-    if (res.ok) {
-      await loadHomework();
-      setShowNew(false);
-      setNewHW({ subject: "", title: "", description: "", dueDate: "", type: "Drawing" });
+      const res = await fetch("/api/homework", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newHW, due_date: newHW.dueDate, class: cls, section: sec }),
+      });
+      if (res.ok) {
+        await loadHomework();
+        setShowNew(false);
+        setNewHW({ subject: "", title: "", description: "", dueDate: "", type: "Drawing" });
+      }
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   const classLabel = classAssigned.replace("-", " ");
@@ -236,7 +246,13 @@ export default function FacultyHomeworkPage() {
       )}
 
       {/* Homework list */}
-      {homeworks.length === 0 ? (
+      {loading && (
+        <div className="glass-card p-10 text-center">
+          <p className="text-sm" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>Loading assignments…</p>
+        </div>
+      )}
+
+      {!loading && homeworks.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
             style={{ background: "rgba(107,203,119,0.10)" }}>
@@ -247,7 +263,7 @@ export default function FacultyHomeworkPage() {
             Click &ldquo;Assign Homework&rdquo; to create the first assignment.
           </p>
         </div>
-      ) : (
+      ) : !loading && (
         <div className="space-y-3">
           {homeworks.map(hw => {
             const isOpen = expanded === hw.id;
