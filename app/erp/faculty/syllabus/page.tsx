@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { ChevronDown, ChevronUp, Upload, CheckCircle, Plus, Trash2, FileText, BookOpen } from "lucide-react";
@@ -12,144 +12,118 @@ interface Topic {
   week: string;
 }
 
-interface SubjectSyllabus {
+interface Syllabus {
   id: string;
   subject: string;
   color: string;
   bg: string;
   term: "Term 1" | "Term 2";
   topics: Topic[];
-  fileUploaded: boolean;
-  fileName: string;
+  file_uploaded: boolean;
+  file_name: string;
   note: string;
 }
 
-const INITIAL: SubjectSyllabus[] = [
-  {
-    id: "SS1", subject: "English", color: "#d97706", bg: "rgba(217,119,6,0.10)", term: "Term 1",
-    fileUploaded: true, fileName: "English_JKG-A_Term1.pdf", note: "Focus on phonics and basic sentence formation.",
-    topics: [
-      { id: "T1", title: "Alphabet Recognition (A–Z)", done: true,  week: "Week 1–2" },
-      { id: "T2", title: "Phonics – CVC Words",        done: true,  week: "Week 3–4" },
-      { id: "T3", title: "Simple Sentences",           done: true,  week: "Week 5–6" },
-      { id: "T4", title: "Picture Reading",            done: false, week: "Week 7–8" },
-      { id: "T5", title: "Basic Comprehension",        done: false, week: "Week 9–10" },
-    ],
-  },
-  {
-    id: "SS2", subject: "Hindi", color: "#7c3aed", bg: "rgba(124,58,237,0.10)", term: "Term 1",
-    fileUploaded: true, fileName: "Hindi_JKG-A_Term1.pdf", note: "Emphasise vowels (swar) practice at home daily.",
-    topics: [
-      { id: "T6",  title: "Swar (Vowels) — अ to अः",   done: true,  week: "Week 1–2" },
-      { id: "T7",  title: "Vyanjan (Consonants) Part 1",done: true,  week: "Week 3–4" },
-      { id: "T8",  title: "Vyanjan Part 2",             done: false, week: "Week 5–6" },
-      { id: "T9",  title: "Matra Practice",             done: false, week: "Week 7–8" },
-      { id: "T10", title: "Simple Hindi Words",         done: false, week: "Week 9–10" },
-    ],
-  },
-  {
-    id: "SS3", subject: "Mathematics", color: "#6BCB77", bg: "rgba(107,203,119,0.10)", term: "Term 1",
-    fileUploaded: false, fileName: "", note: "",
-    topics: [
-      { id: "T11", title: "Numbers 1–20 (Recognition)", done: true,  week: "Week 1–2" },
-      { id: "T12", title: "Counting Objects",           done: true,  week: "Week 3–4" },
-      { id: "T13", title: "Before & After Numbers",     done: true,  week: "Week 5–6" },
-      { id: "T14", title: "Addition (single digit)",    done: false, week: "Week 7–8" },
-      { id: "T15", title: "Subtraction (single digit)", done: false, week: "Week 9–10" },
-    ],
-  },
-  {
-    id: "SS4", subject: "EVS", color: "#FF6B6B", bg: "rgba(255,107,107,0.10)", term: "Term 1",
-    fileUploaded: false, fileName: "", note: "",
-    topics: [
-      { id: "T16", title: "My Body",          done: true,  week: "Week 1–2" },
-      { id: "T17", title: "My Family",        done: true,  week: "Week 3–4" },
-      { id: "T18", title: "Animals & Birds",  done: false, week: "Week 5–6" },
-      { id: "T19", title: "Plants & Trees",   done: false, week: "Week 7–8" },
-      { id: "T20", title: "My Neighbourhood", done: false, week: "Week 9–10" },
-    ],
-  },
-  {
-    id: "SS5", subject: "Art & Craft", color: "#d97706", bg: "rgba(255,217,61,0.15)", term: "Term 1",
-    fileUploaded: false, fileName: "", note: "",
-    topics: [
-      { id: "T21", title: "Colouring within Lines", done: true,  week: "Week 1–2" },
-      { id: "T22", title: "Free Drawing",           done: true,  week: "Week 3–4" },
-      { id: "T23", title: "Clay Modelling",         done: true,  week: "Week 5–6" },
-      { id: "T24", title: "Paper Folding (Origami)",done: false, week: "Week 7–8" },
-      { id: "T25", title: "Collage Making",         done: false, week: "Week 9–10" },
-    ],
-  },
-];
-
 export default function FacultySyllabusPage() {
-  const [user, setUser] = useState("");
-  const [syllabi, setSyllabi] = useState<SubjectSyllabus[]>(INITIAL);
-  const [expanded, setExpanded] = useState<string | null>("SS1");
+  const [userName, setUserName] = useState("");
+  const [classLabel, setClassLabel] = useState("");
+  const [syllabi, setSyllabi] = useState<Syllabus[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [term, setTerm] = useState<"Term 1" | "Term 2">("Term 1");
   const [showAddTopic, setShowAddTopic] = useState<string | null>(null);
   const [newTopicTitle, setNewTopicTitle] = useState("");
   const [newTopicWeek, setNewTopicWeek] = useState("");
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      setUser(user.user_metadata?.name || "Faculty");
-    });
+  const loadSyllabus = useCallback(async (t: string) => {
+    const res = await fetch(`/api/syllabus?term=${encodeURIComponent(t)}`);
+    const data = await res.json();
+    if (data.syllabus) {
+      setSyllabi(data.syllabus as Syllabus[]);
+      if ((data.syllabus as Syllabus[]).length > 0) setExpanded((data.syllabus as Syllabus[])[0].id);
+    }
   }, []);
 
-  function toggleTopic(syllabusId: string, topicId: string) {
-    setSyllabi(prev => prev.map(s =>
-      s.id !== syllabusId ? s :
-        { ...s, topics: s.topics.map(t => t.id === topicId ? { ...t, done: !t.done } : t) }
-    ));
+  useEffect(() => {
+    const sb = createClient();
+    sb.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      setUserName(user.app_metadata?.name || user.user_metadata?.name || "Faculty");
+      setClassLabel((user.app_metadata?.class_assigned || "").replace("-", " "));
+    });
+    loadSyllabus("Term 1");
+  }, [loadSyllabus]);
+
+  async function patchSyllabus(id: string, payload: Record<string, unknown>) {
+    const res = await fetch(`/api/syllabus/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
   }
 
-  function addTopic(syllabusId: string) {
+  async function toggleTopic(syllabusId: string, topicId: string) {
+    const syl = syllabi.find(s => s.id === syllabusId);
+    if (!syl) return;
+    const newTopics = syl.topics.map(t => t.id === topicId ? { ...t, done: !t.done } : t);
+    setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, topics: newTopics }));
+    await patchSyllabus(syllabusId, { topics: newTopics });
+  }
+
+  async function addTopic(syllabusId: string) {
     if (!newTopicTitle.trim()) return;
+    const syl = syllabi.find(s => s.id === syllabusId);
+    if (!syl) return;
     const topic: Topic = {
-      id: `T${Date.now()}`, title: newTopicTitle.trim(),
+      id: `t-${Date.now()}`, title: newTopicTitle.trim(),
       week: newTopicWeek.trim() || "TBD", done: false,
     };
-    setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, topics: [...s.topics, topic] }));
-    setNewTopicTitle("");
-    setNewTopicWeek("");
-    setShowAddTopic(null);
+    const newTopics = [...syl.topics, topic];
+    setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, topics: newTopics }));
+    setNewTopicTitle(""); setNewTopicWeek(""); setShowAddTopic(null);
+    await patchSyllabus(syllabusId, { topics: newTopics });
   }
 
-  function deleteTopic(syllabusId: string, topicId: string) {
-    setSyllabi(prev => prev.map(s =>
-      s.id !== syllabusId ? s : { ...s, topics: s.topics.filter(t => t.id !== topicId) }
-    ));
+  async function deleteTopic(syllabusId: string, topicId: string) {
+    const syl = syllabi.find(s => s.id === syllabusId);
+    if (!syl) return;
+    const newTopics = syl.topics.filter(t => t.id !== topicId);
+    setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, topics: newTopics }));
+    await patchSyllabus(syllabusId, { topics: newTopics });
   }
 
-  function updateNote(syllabusId: string, note: string) {
+  async function updateNote(syllabusId: string, note: string) {
     setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, note }));
+    await patchSyllabus(syllabusId, { note });
   }
 
   function handleFileChange(syllabusId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, fileUploaded: true, fileName: file.name }));
+    setSyllabi(prev => prev.map(s => s.id !== syllabusId ? s : { ...s, file_uploaded: true, file_name: file.name }));
+    patchSyllabus(syllabusId, { file_uploaded: true, file_name: file.name });
+  }
+
+  function handleTermChange(t: "Term 1" | "Term 2") {
+    setTerm(t);
+    loadSyllabus(t);
   }
 
   const filtered = syllabi.filter(s => s.term === term);
 
   return (
-    <ERPShell role="faculty" userName={user}>
+    <ERPShell role="faculty" userName={userName}>
       <div className="mb-6">
         <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>Syllabus Manager</h1>
         <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-          JKG-A · Manage topics, track coverage, and share PDF syllabi with parents
+          {classLabel || "Your class"} · Track topics, add notes, and upload syllabi for parents
         </p>
       </div>
 
-      {/* Term tabs */}
       <div className="flex gap-2 mb-5">
         {(["Term 1", "Term 2"] as const).map(t => (
-          <button key={t} type="button" onClick={() => setTerm(t)}
+          <button key={t} type="button" onClick={() => handleTermChange(t)}
             className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
             style={{
               background: term === t ? "rgba(107,203,119,0.12)" : "rgba(26,26,46,0.05)",
@@ -160,6 +134,16 @@ export default function FacultySyllabusPage() {
         ))}
       </div>
 
+      {filtered.length === 0 && (
+        <div className="glass-card p-10 text-center">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
+            style={{ background: "rgba(107,203,119,0.10)" }}>
+            <BookOpen size={18} style={{ color: "#6BCB77" }} />
+          </div>
+          <p className="text-sm text-navy font-semibold" style={{ fontFamily: "var(--font-nunito)" }}>No syllabus for {term} yet</p>
+        </div>
+      )}
+
       <div className="space-y-2">
         {filtered.map(s => {
           const open = expanded === s.id;
@@ -168,7 +152,6 @@ export default function FacultySyllabusPage() {
 
           return (
             <div key={s.id} className="glass-card overflow-hidden">
-              {/* Header */}
               <button type="button" onClick={() => setExpanded(open ? null : s.id)}
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-left">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -182,17 +165,18 @@ export default function FacultySyllabusPage() {
                       <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: s.color }} />
                     </div>
                     <span className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
-                      {doneCount}/{s.topics.length} topics covered
+                      {doneCount}/{s.topics.length} covered
                     </span>
-                    {s.fileUploaded && <CheckCircle size={12} style={{ color: "#6BCB77" }} />}
+                    {s.file_uploaded && <CheckCircle size={12} style={{ color: "#6BCB77" }} />}
                   </div>
                 </div>
-                {open ? <ChevronUp size={16} style={{ color: "rgba(26,26,46,0.40)" }} /> : <ChevronDown size={16} style={{ color: "rgba(26,26,46,0.40)" }} />}
+                {open
+                  ? <ChevronUp size={16} style={{ color: "rgba(26,26,46,0.40)" }} />
+                  : <ChevronDown size={16} style={{ color: "rgba(26,26,46,0.40)" }} />}
               </button>
 
               {open && (
                 <div className="px-4 pb-4" style={{ borderTop: "1px solid rgba(26,26,46,0.06)" }}>
-                  {/* Topics */}
                   <p className="text-xs font-bold mt-3 mb-2 uppercase tracking-wide" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>Topics</p>
                   <div className="space-y-1.5 mb-3">
                     {s.topics.map(t => (
@@ -204,7 +188,7 @@ export default function FacultySyllabusPage() {
                           {t.done && <span style={{ color: "white", fontSize: "0.6rem", fontWeight: 700 }}>✓</span>}
                         </button>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold" style={{ color: t.done ? s.color : "rgba(26,26,46,0.75)", fontFamily: "var(--font-nunito)", textDecoration: t.done ? "none" : "none" }}>{t.title}</p>
+                          <p className="text-xs font-semibold" style={{ color: t.done ? s.color : "rgba(26,26,46,0.75)", fontFamily: "var(--font-nunito)" }}>{t.title}</p>
                         </div>
                         <span className="text-xs flex-shrink-0" style={{ color: "rgba(26,26,46,0.35)", fontFamily: "var(--font-inter)" }}>{t.week}</span>
                         <button type="button" onClick={() => deleteTopic(s.id, t.id)}
@@ -215,7 +199,6 @@ export default function FacultySyllabusPage() {
                     ))}
                   </div>
 
-                  {/* Add topic */}
                   {showAddTopic === s.id ? (
                     <div className="flex gap-2 mb-3">
                       <input type="text" placeholder="Topic title" value={newTopicTitle}
@@ -237,36 +220,34 @@ export default function FacultySyllabusPage() {
                     </div>
                   ) : (
                     <button type="button" onClick={() => setShowAddTopic(s.id)}
-                      className="flex items-center gap-1.5 text-xs font-bold mb-3 px-3 py-2 rounded-xl transition-all"
+                      className="flex items-center gap-1.5 text-xs font-bold mb-3 px-3 py-2 rounded-xl"
                       style={{ color: s.color, background: `${s.color}10`, fontFamily: "var(--font-nunito)" }}>
                       <Plus size={12} /> Add Topic
                     </button>
                   )}
 
-                  {/* Note */}
                   <p className="text-xs font-bold mb-1 uppercase tracking-wide" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>Note for Parents</p>
-                  <textarea rows={2} placeholder="Add a note visible to parents about this subject…"
+                  <textarea rows={2} placeholder="Add a note visible to parents…"
                     value={s.note}
                     onChange={e => updateNote(s.id, e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl text-xs mb-3 resize-none"
                     style={{ background: "rgba(26,26,46,0.04)", border: "1px solid rgba(26,26,46,0.08)", outline: "none", fontFamily: "var(--font-inter)", color: "rgba(26,26,46,0.75)" }}
                   />
 
-                  {/* File upload */}
                   <div className="flex items-center gap-2">
                     <input ref={el => { fileRefs.current[s.id] = el; }} type="file" accept=".pdf,.doc,.docx" className="hidden"
                       onChange={e => handleFileChange(s.id, e)} />
                     <button type="button" onClick={() => fileRefs.current[s.id]?.click()}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold"
                       style={{ background: `${s.color}15`, color: s.color, border: `1px solid ${s.color}28`, fontFamily: "var(--font-nunito)" }}>
                       <Upload size={13} />
-                      {s.fileUploaded ? "Replace PDF" : "Upload PDF Syllabus"}
+                      {s.file_uploaded ? "Replace PDF" : "Upload PDF Syllabus"}
                     </button>
-                    {s.fileUploaded && (
+                    {s.file_uploaded && (
                       <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
                         style={{ background: "rgba(107,203,119,0.08)", border: "1px solid rgba(107,203,119,0.20)" }}>
                         <FileText size={12} style={{ color: "#6BCB77" }} />
-                        <span className="text-xs font-semibold truncate max-w-40" style={{ color: "#6BCB77", fontFamily: "var(--font-inter)" }}>{s.fileName}</span>
+                        <span className="text-xs font-semibold truncate max-w-40" style={{ color: "#6BCB77", fontFamily: "var(--font-inter)" }}>{s.file_name}</span>
                         <CheckCircle size={12} style={{ color: "#6BCB77" }} />
                       </div>
                     )}
@@ -280,4 +261,3 @@ export default function FacultySyllabusPage() {
     </ERPShell>
   );
 }
-

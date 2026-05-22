@@ -5,19 +5,20 @@ import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
 import { CheckCircle, AlertCircle, Clock, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
 
-type HWStatus = "pending" | "done";
+type HWStatus = "pending" | "submitted" | "reviewed";
 type HWType = "Drawing" | "Activity" | "Oral" | "Written" | "Reading";
 
 interface Homework {
-  id: number;
+  id: string;
   subject: string;
   title: string;
   description: string;
-  dueDate: string;
+  due_date: string;
   type: HWType;
+  submission_id: string | null;
   status: HWStatus;
-  submittedOn?: string;
-  teacherRemark?: string;
+  submitted_at: string | null;
+  remarks: string | null;
 }
 
 const TYPE_STYLE: Record<HWType, { bg: string; color: string }> = {
@@ -28,181 +29,136 @@ const TYPE_STYLE: Record<HWType, { bg: string; color: string }> = {
   Reading:  { bg: "rgba(26,26,46,0.06)",    color: "rgba(26,26,46,0.55)" },
 };
 
-const INITIAL_HW: Homework[] = [
-  {
-    id: 1,
-    subject: "English",
-    title: "Draw your favourite animal",
-    description: "Help Aarav draw his favourite animal using crayons. Label the animal's name below the drawing.",
-    dueDate: "2026-05-20",
-    type: "Drawing",
-    status: "pending",
-  },
-  {
-    id: 2,
-    subject: "Maths",
-    title: "Count objects around the house",
-    description: "Count 5 different groups of objects at home and write the numbers on a sheet of paper.",
-    dueDate: "2026-05-21",
-    type: "Activity",
-    status: "pending",
-  },
-  {
-    id: 3,
-    subject: "Hindi",
-    title: "Revise vowels (अ, आ, इ, ई)",
-    description: "Help Aarav practise the first 4 Hindi vowels — say them aloud together 3 times.",
-    dueDate: "2026-05-22",
-    type: "Oral",
-    status: "done",
-    submittedOn: "2026-05-19",
-    teacherRemark: "Excellent recitation! Aarav did very well. 🌟",
-  },
-  {
-    id: 4,
-    subject: "English",
-    title: "Read a short story aloud",
-    description: "Read the short story on page 12 of the English textbook aloud with your child.",
-    dueDate: "2026-05-24",
-    type: "Reading",
-    status: "pending",
-  },
-];
-
 function daysUntil(dateStr: string) {
-  const diff = new Date(dateStr).setHours(0,0,0,0) - new Date("2026-05-20").setHours(0,0,0,0);
-  return Math.round(diff / 86400000);
+  const diff = new Date(dateStr).setHours(0,0,0,0) - new Date().setHours(0,0,0,0);
+  return Math.ceil(diff / 86400000);
 }
 
 export default function ParentHomeworkPage() {
-  const [user, setUser] = useState("");
-  const [homeworks, setHomeworks] = useState<Homework[]>(INITIAL_HW);
-  const [expanded, setExpanded] = useState<number | null>(1);
-  const [tab, setTab] = useState<"all" | "pending" | "done">("all");
+  const [userName, setUserName] = useState("");
+  const [homeworks, setHomeworks] = useState<Homework[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [marking, setMarking] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      setUser(user.user_metadata?.name || "Parent");
+    const sb = createClient();
+    sb.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserName(user.user_metadata?.name || "Parent");
     });
+    fetch("/api/homework/my-child")
+      .then(r => r.json())
+      .then(data => {
+        if (data.homework) setHomeworks(data.homework as Homework[]);
+        if ((data.homework as Homework[])?.length > 0) setExpanded((data.homework as Homework[])[0].id);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  function markDone(id: number) {
-    setHomeworks(prev => prev.map(h =>
-      h.id !== id ? h : { ...h, status: "done", submittedOn: "2026-05-20" }
-    ));
+  async function markDone(hw: Homework) {
+    if (!hw.submission_id) return;
+    setMarking(hw.id);
+    const res = await fetch(`/api/homework/${hw.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ submission_id: hw.submission_id, status: "submitted" }),
+    });
+    if (res.ok) {
+      setHomeworks(prev => prev.map(h =>
+        h.id !== hw.id ? h : { ...h, status: "submitted", submitted_at: new Date().toISOString() }
+      ));
+    }
+    setMarking(null);
   }
 
-  const pending = homeworks.filter(h => h.status === "pending");
-  const done    = homeworks.filter(h => h.status === "done");
-  const shown   = tab === "pending" ? pending : tab === "done" ? done : homeworks;
+  const pending   = homeworks.filter(h => h.status === "pending").length;
+  const submitted = homeworks.filter(h => h.status === "submitted").length;
+  const reviewed  = homeworks.filter(h => h.status === "reviewed").length;
 
   return (
-    <ERPShell role="parent" userName={user}>
+    <ERPShell role="parent" userName={userName}>
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>Aarav's Homework</h1>
+        <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>Homework</h1>
         <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-          JKG-A · Academic Year 2026–27
+          Track and submit your child&apos;s assignments
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Pending", value: pending.length, color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
-          { label: "Done",    value: done.length,    color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
-          { label: "Total",   value: homeworks.length, color: "#7c3aed", bg: "rgba(167,139,250,0.10)" },
+          { label: "Total",     value: homeworks.length, color: "#7c3aed", bg: "rgba(167,139,250,0.10)" },
+          { label: "Pending",   value: pending,           color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
+          { label: "Submitted", value: submitted,         color: "#d97706", bg: "rgba(255,217,61,0.12)" },
+          { label: "Reviewed",  value: reviewed,          color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
         ].map(s => (
-          <div key={s.label} className="glass-card p-4 text-center">
+          <div key={s.label} className="glass-card p-4">
+            <p className="text-xs font-semibold mb-1" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>{s.label}</p>
             <p className="text-2xl font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>{s.value}</p>
-            <p className="text-xs font-semibold mt-0.5" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Pending alert */}
-      {pending.length > 0 && (
-        <div className="mb-5 p-4 rounded-2xl flex items-start gap-3"
-          style={{ background: "rgba(255,107,107,0.07)", border: "1.5px solid rgba(255,107,107,0.20)" }}>
-          <AlertCircle size={18} style={{ color: "#FF6B6B", flexShrink: 0, marginTop: 2 }} />
-          <div>
-            <p className="text-sm font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>
-              {pending.length} homework{pending.length > 1 ? "s" : ""} pending
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-inter)" }}>
-              Earliest due: {new Date([...pending].sort((a,b) => a.dueDate.localeCompare(b.dueDate))[0].dueDate)
-                .toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
-            </p>
-          </div>
+      {loading && (
+        <div className="glass-card p-10 text-center">
+          <p className="text-sm" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>Loading homework…</p>
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-4">
-        {(["all", "pending", "done"] as const).map(t => (
-          <button key={t} type="button" onClick={() => setTab(t)}
-            className="px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition-all duration-150"
-            style={{
-              background: tab === t ? "rgba(124,58,237,0.12)" : "rgba(26,26,46,0.05)",
-              color: tab === t ? "#7c3aed" : "rgba(26,26,46,0.55)",
-              fontFamily: "var(--font-nunito)",
-            }}>
-            {t} {t === "all" ? `(${homeworks.length})` : t === "pending" ? `(${pending.length})` : `(${done.length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* Homework cards */}
-      <div className="space-y-3">
-        {shown.length === 0 && (
-          <div className="glass-card p-10 text-center">
-            <p className="text-2xl mb-2">🎉</p>
-            <p className="text-sm font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>All caught up!</p>
-            <p className="text-xs mt-1" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>No pending homework right now.</p>
+      {!loading && homeworks.length === 0 && (
+        <div className="glass-card p-12 text-center">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
+            style={{ background: "rgba(107,203,119,0.10)" }}>
+            <CheckCircle size={22} style={{ color: "#6BCB77" }} />
           </div>
-        )}
+          <p className="text-sm font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>No homework assigned yet</p>
+        </div>
+      )}
 
-        {shown.map(hw => {
-          const isOpen  = expanded === hw.id;
-          const days    = daysUntil(hw.dueDate);
-          const isDone  = hw.status === "done";
-          const urgent  = !isDone && days <= 0;
-          const typeStyle = TYPE_STYLE[hw.type];
+      <div className="space-y-3">
+        {homeworks.map(hw => {
+          const isOpen = expanded === hw.id;
+          const days = daysUntil(hw.due_date);
+          const overdue = hw.status === "pending" && days < 0;
+
+          const statusIcon =
+            hw.status === "reviewed"  ? <CheckCircle size={14} style={{ color: "#6BCB77" }} /> :
+            hw.status === "submitted" ? <Clock size={14} style={{ color: "#d97706" }} /> :
+            overdue                   ? <AlertCircle size={14} style={{ color: "#FF6B6B" }} /> :
+                                        <BookOpen size={14} style={{ color: "#7c3aed" }} />;
+
+          const statusLabel =
+            hw.status === "reviewed"  ? "Reviewed by teacher" :
+            hw.status === "submitted" ? "Submitted — awaiting review" :
+            overdue                   ? "Overdue" :
+            days === 0                ? "Due today" :
+            days === 1                ? "Due tomorrow" :
+                                        `Due in ${days} days`;
+
+          const statusColor =
+            hw.status === "reviewed"  ? "#6BCB77" :
+            hw.status === "submitted" ? "#d97706" :
+            overdue                   ? "#FF6B6B" : "#7c3aed";
 
           return (
             <div key={hw.id} className="glass-card overflow-hidden"
-              style={{
-                border: isDone
-                  ? "1.5px solid rgba(107,203,119,0.25)"
-                  : urgent
-                  ? "1.5px solid rgba(255,107,107,0.30)"
-                  : "1.5px solid rgba(255,255,255,0.60)",
-              }}>
-              <button type="button" className="w-full flex items-center gap-3 p-4 text-left"
+              style={{ border: overdue ? "1.5px solid rgba(255,107,107,0.25)" : "1.5px solid rgba(255,255,255,0.60)" }}>
+              <button type="button" className="w-full flex items-center gap-4 p-4 text-left"
                 onClick={() => setExpanded(isOpen ? null : hw.id)}>
-                {/* Status icon */}
-                <div className="flex-shrink-0">
-                  {isDone
-                    ? <CheckCircle size={20} style={{ color: "#6BCB77" }} />
-                    : urgent
-                    ? <AlertCircle size={20} style={{ color: "#FF6B6B" }} />
-                    : <Clock size={20} style={{ color: "#d97706" }} />}
-                </div>
-
+                <span className="text-xs font-bold px-2.5 py-1.5 rounded-xl flex-shrink-0"
+                  style={{ ...TYPE_STYLE[hw.type], fontFamily: "var(--font-nunito)", minWidth: 64, textAlign: "center" }}>
+                  {hw.type}
+                </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{hw.title}</p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="text-xs font-bold px-1.5 py-0.5 rounded-lg" style={{ ...typeStyle, fontFamily: "var(--font-nunito)" }}>{hw.type}</span>
-                    <span className="text-xs" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>{hw.subject}</span>
-                    {isDone
-                      ? <span className="text-xs font-semibold" style={{ color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>Done ✅</span>
-                      : <span className="text-xs font-semibold" style={{ color: urgent ? "#FF6B6B" : days === 1 ? "#d97706" : "rgba(26,26,46,0.50)", fontFamily: "var(--font-nunito)" }}>
-                          {days === 0 ? "Due Today" : days < 0 ? `${Math.abs(days)}d overdue` : `Due in ${days}d`}
-                        </span>}
-                  </div>
+                  <p className="text-sm font-bold text-navy truncate" style={{ fontFamily: "var(--font-nunito)" }}>{hw.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
+                    {hw.subject} · {new Date(hw.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
                 </div>
-
+                <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
+                  {statusIcon}
+                  <span className="text-xs font-semibold" style={{ color: statusColor, fontFamily: "var(--font-nunito)" }}>{statusLabel}</span>
+                </div>
                 {isOpen
                   ? <ChevronUp size={16} style={{ color: "rgba(26,26,46,0.40)", flexShrink: 0 }} />
                   : <ChevronDown size={16} style={{ color: "rgba(26,26,46,0.40)", flexShrink: 0 }} />}
@@ -210,43 +166,33 @@ export default function ParentHomeworkPage() {
 
               {isOpen && (
                 <div className="px-4 pb-4 border-t" style={{ borderColor: "rgba(26,26,46,0.06)" }}>
-                  <p className="text-sm leading-relaxed mt-3 mb-4" style={{ color: "rgba(26,26,46,0.65)", fontFamily: "var(--font-inter)" }}>
+                  <p className="text-xs mt-3 mb-3 leading-relaxed" style={{ color: "rgba(26,26,46,0.60)", fontFamily: "var(--font-inter)" }}>
                     {hw.description}
                   </p>
 
-                  {/* Due date row */}
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(26,26,46,0.06)" }}>
-                      <BookOpen size={13} style={{ color: "rgba(26,26,46,0.45)" }} />
-                    </div>
-                    <p className="text-xs" style={{ color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-inter)" }}>
-                      Due: <span className="font-semibold text-navy">{new Date(hw.dueDate).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}</span>
-                    </p>
+                  {/* Mobile status */}
+                  <div className="flex items-center gap-1.5 mb-3 sm:hidden">
+                    {statusIcon}
+                    <span className="text-xs font-semibold" style={{ color: statusColor, fontFamily: "var(--font-nunito)" }}>{statusLabel}</span>
                   </div>
 
-                  {/* Teacher remark */}
-                  {hw.teacherRemark && (
-                    <div className="p-3 rounded-2xl mb-4" style={{ background: "rgba(107,203,119,0.08)", border: "1px solid rgba(107,203,119,0.20)" }}>
-                      <p className="text-xs font-semibold mb-0.5" style={{ color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>Teacher's Remark</p>
-                      <p className="text-sm" style={{ color: "rgba(26,26,46,0.70)", fontFamily: "var(--font-inter)" }}>{hw.teacherRemark}</p>
+                  {hw.remarks && (
+                    <div className="mb-3 px-3 py-2.5 rounded-xl"
+                      style={{ background: "rgba(107,203,119,0.08)", border: "1px solid rgba(107,203,119,0.20)" }}>
+                      <p className="text-xs font-bold mb-0.5" style={{ color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>Teacher&apos;s Feedback</p>
+                      <p className="text-xs italic" style={{ color: "rgba(26,26,46,0.65)", fontFamily: "var(--font-inter)" }}>&ldquo;{hw.remarks}&rdquo;</p>
                     </div>
                   )}
 
-                  {!isDone ? (
-                    <button type="button" onClick={() => markDone(hw.id)}
-                      className="w-full py-2.5 rounded-2xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5"
-                      style={{
-                        background: "linear-gradient(135deg, #6BCB77, #4CAF50)",
-                        boxShadow: "0 4px 14px rgba(107,203,119,0.28)",
-                        fontFamily: "var(--font-nunito)",
-                      }}>
-                      Mark as Done ✓
+                  {hw.status === "pending" && hw.submission_id && (
+                    <button type="button"
+                      onClick={() => markDone(hw)}
+                      disabled={marking === hw.id}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-60"
+                      style={{ background: "linear-gradient(135deg,#d97706,#fbbf24)", boxShadow: "0 4px 14px rgba(217,119,6,0.25)", fontFamily: "var(--font-nunito)" }}>
+                      <CheckCircle size={14} />
+                      {marking === hw.id ? "Marking…" : "Mark as Done"}
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>
-                      <CheckCircle size={15} />
-                      Completed on {hw.submittedOn && new Date(hw.submittedOn).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                    </div>
                   )}
                 </div>
               )}
