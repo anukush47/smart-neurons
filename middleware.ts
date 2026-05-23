@@ -39,7 +39,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/erp/login", request.url));
     }
 
-    const VALID_ROLES = ["admin", "faculty", "parent", "superadmin"];
+    const VALID_ROLES = ["admin", "faculty", "parent"];
     const role = user.app_metadata?.role as string | undefined;
     if (!role || !VALID_ROLES.includes(role)) {
       return NextResponse.redirect(new URL("/erp/login", request.url));
@@ -54,14 +54,11 @@ export async function middleware(request: NextRequest) {
     if (path.startsWith("/erp/parent") && role !== "parent") {
       return NextResponse.redirect(new URL(`/erp/${role}`, request.url));
     }
-    if (path.startsWith("/erp/superadmin") && role !== "superadmin") {
-      return NextResponse.redirect(new URL(`/erp/${role}`, request.url));
-    }
   }
 
   if (path === "/erp/login" && user) {
     const role = user.app_metadata?.role as string | undefined;
-    const validRoles = ["admin", "faculty", "parent", "superadmin"];
+    const validRoles = ["admin", "faculty", "parent"];
     if (role && validRoles.includes(role)) {
       return NextResponse.redirect(new URL(`/erp/${role}`, request.url));
     }

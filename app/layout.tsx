@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Inter, Nunito } from "next/font/google";
 import "./globals.css";
+import { alpha } from "framer-motion";
 
 const playfair = Playfair_Display({
   variable: "--font-playfair",

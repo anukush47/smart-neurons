@@ -8,11 +8,11 @@ import { createClient } from "@/lib/supabase/client";
 import {
   LayoutDashboard, Users, GraduationCap, CalendarDays, ClipboardList,
   CreditCard, Bell, MessageSquare, Image as ImageIcon, BarChart2,
-  Settings, LogOut, Menu, X, ChevronRight, BookOpen, FileText,
-  Clock, Award, Home, Building2, Activity, Shield, UserCircle,
+  Settings, LogOut, Menu, ChevronRight, BookOpen, FileText,
+  Clock, Award, Home, UserCircle,
 } from "lucide-react";
 
-type Role = "superadmin" | "admin" | "faculty" | "parent";
+type Role = "admin" | "faculty" | "parent";
 
 interface NavItem {
   href: string;
@@ -22,14 +22,6 @@ interface NavItem {
 }
 
 const navByRole: Record<Role, NavItem[]> = {
-  superadmin: [
-    { href: "/erp/superadmin",          label: "Dashboard",    icon: <LayoutDashboard size={18} /> },
-    { href: "/erp/superadmin/schools",  label: "Schools",      icon: <Building2 size={18} /> },
-    { href: "/erp/superadmin/analytics",label: "Analytics",    icon: <BarChart2 size={18} /> },
-    { href: "/erp/superadmin/health",   label: "System Health",icon: <Activity size={18} /> },
-    { href: "/erp/superadmin/settings", label: "Settings",     icon: <Settings size={18} /> },
-    { href: "/erp/superadmin/profile",  label: "My Profile",   icon: <UserCircle size={18} /> },
-  ],
   admin: [
     { href: "/erp/admin",              label: "Dashboard",    icon: <LayoutDashboard size={18} /> },
     { href: "/erp/admin/students",     label: "Students",     icon: <Users size={18} /> },
@@ -70,7 +62,6 @@ const navByRole: Record<Role, NavItem[]> = {
 };
 
 const roleConfig: Record<Role, { label: string; color: string; bg: string; emoji: string }> = {
-  superadmin: { label: "Super Admin", color: "#1A1A2E", bg: "rgba(26,26,46,0.08)", emoji: "🏢" },
   admin: { label: "School Admin", color: "#FF6B6B", bg: "rgba(255,107,107,0.10)", emoji: "📊" },
   faculty: { label: "Faculty", color: "#6BCB77", bg: "rgba(107,203,119,0.10)", emoji: "🎓" },
   parent: { label: "Parent", color: "#d97706", bg: "rgba(255,217,61,0.12)", emoji: "👨‍👩‍👧" },

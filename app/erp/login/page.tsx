@@ -8,7 +8,7 @@ import { Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { createClient } from "@/lib/supabase/client";
 
-type Role = "superadmin" | "admin" | "faculty" | "parent";
+type Role = "admin" | "faculty" | "parent";
 
 interface RoleConfig {
   id: Role;
@@ -24,18 +24,6 @@ interface RoleConfig {
 }
 
 const roles: RoleConfig[] = [
-  {
-    id: "superadmin",
-    label: "Super Admin",
-    emoji: "🏢",
-    tagline: "Platform management & oversight",
-    color: "#1A1A2E",
-    bg: "rgba(26,26,46,0.08)",
-    border: "rgba(26,26,46,0.20)",
-    loginField: "email",
-    loginLabel: "Admin Email",
-    loginPlaceholder: "superadmin@smartneurons.in",
-  },
   {
     id: "admin",
     label: "School Admin",
@@ -126,7 +114,7 @@ export default function ERPLoginPage() {
       }
 
       const role = data.user?.app_metadata?.role as string | undefined;
-      const validRoles = ["admin", "faculty", "parent", "superadmin"];
+      const validRoles = ["admin", "faculty", "parent"];
       if (!role || !validRoles.includes(role)) {
         setError("Account is not configured. Please contact your administrator.");
         return;

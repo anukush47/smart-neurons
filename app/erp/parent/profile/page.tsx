@@ -3,212 +3,190 @@
 import { useState, useEffect } from "react";
 import ERPShell from "@/components/erp/ERPShell";
 import { createClient } from "@/lib/supabase/client";
-import {
-  User, Phone, Calendar, BookOpen, CreditCard,
-  Pencil, Check, X, GraduationCap, ClipboardList, Hash,
-} from "lucide-react";
-import type { User as SupaUser } from "@supabase/supabase-js";
+import { User, Mail, Phone, GraduationCap, Hash, CheckCircle, AlertCircle } from "lucide-react";
 
-function InfoRow({ icon, label, value, color = "#d97706" }: {
-  icon: React.ReactNode; label: string; value: string; color?: string;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
-        style={{ background: `${color}18`, color }}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>{label}</p>
-        <p className="text-sm font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{value}</p>
-      </div>
-    </div>
-  );
-}
-
-interface ChildInfo {
+interface Child {
+  id: string;
   name: string;
   class: string;
   section: string;
-  roll_no: string;
+  roll_no: number | null;
+  dob: string | null;
+  gender: string | null;
 }
 
 export default function ParentProfilePage() {
-  const [user, setUser] = useState<SupaUser | null>(null);
-  const [displayName, setDisplayName] = useState("");
-  const [editName, setEditName] = useState("");
-  const [editing, setEditing] = useState(false);
+  const [profile, setProfile] = useState<{
+    id: string; email: string; name: string; phone: string; createdAt: string;
+  } | null>(null);
+  const [child, setChild] = useState<Child | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [child, setChild] = useState<ChildInfo | null>(null);
-  const [feeStats, setFeeStats] = useState({ paid: 0, total: 0, pending: 0 });
+  const [flash, setFlash] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
 
   useEffect(() => {
-    const sb = createClient();
-    sb.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      const name = user.user_metadata?.name || "Parent";
-      setUser(user);
-      setDisplayName(name);
-      setEditName(name);
-    });
+    async function load() {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) { setLoading(false); return; }
+      const u = data.user;
+      const p = {
+        id: u.id,
+        email: u.email ?? "",
+        name: u.app_metadata?.name || u.user_metadata?.name || "Parent",
+        phone: u.app_metadata?.phone || u.user_metadata?.phone || "",
+        createdAt: u.created_at || "",
+      };
+      setProfile(p);
+      setName(p.name);
+      setPhone(p.phone);
 
-    fetch("/api/fees/my-child")
-      .then(r => r.json())
-      .then(data => {
-        if (!data.fees?.length) return;
-        // Extract child from first record
-        const first = data.fees[0];
-        if (first.students) setChild(first.students as ChildInfo);
-        const paid    = data.fees.filter((f: { status: string }) => f.status === "paid").length;
-        const pending = data.fees.filter((f: { status: string }) => f.status === "pending").length;
-        setFeeStats({ paid, total: data.fees.length, pending });
-      })
-      .catch(() => {/* ignore */});
+      // Load child info
+      const res = await fetch("/api/students/my-child");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.student) setChild(json.student);
+      }
+      setLoading(false);
+    }
+    load();
   }, []);
 
-  async function handleSave() {
-    if (!user || !editName.trim()) return;
-    setSaving(true);
-    const sb = createClient();
-    const { error } = await sb.auth.updateUser({ data: { name: editName.trim() } });
-    if (!error) {
-      setDisplayName(editName.trim());
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    }
-    setSaving(false);
-    setEditing(false);
+  function showFlash(type: "ok" | "err", msg: string) {
+    setFlash({ type, msg });
+    setTimeout(() => setFlash(null), 3000);
   }
 
-  const initials = displayName.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2) || "P";
-  const memberSince = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })
-    : "—";
-  const phone = user?.phone || "—";
+  async function handleSave() {
+    setSaving(true);
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
+    });
+    const json = await res.json();
+    setSaving(false);
+    if (json.error) { showFlash("err", json.error); return; }
+    setProfile(prev => prev ? { ...prev, name: name.trim(), phone: phone.trim() } : prev);
+    showFlash("ok", "Profile updated");
+  }
 
-  const stats = [
-    { label: "Child's Class",   value: child ? `${child.class}-${child.section}` : "—", icon: <BookOpen size={18} />,      color: "#d97706" },
-    { label: "Roll Number",     value: child?.roll_no ? `#${child.roll_no}` : "—",      icon: <Hash size={18} />,           color: "#6BCB77" },
-    { label: "Fees Paid",       value: `${feeStats.paid}/${feeStats.total}`,             icon: <CreditCard size={18} />,     color: "#7c3aed" },
-    { label: "Fees Pending",    value: String(feeStats.pending),                          icon: <ClipboardList size={18} />,  color: "#FF6B6B" },
-  ];
+  if (loading) return (
+    <ERPShell role="parent">
+      <div className="flex items-center justify-center h-64 text-gray-400" style={{ fontFamily: "var(--font-nunito)" }}>Loading…</div>
+    </ERPShell>
+  );
+
+  if (!profile) return (
+    <ERPShell role="parent">
+      <div className="text-center py-16 text-red-500" style={{ fontFamily: "var(--font-nunito)" }}>Could not load profile</div>
+    </ERPShell>
+  );
+
+  const initials = profile.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
   return (
-    <ERPShell role="parent" userName={displayName}>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>My Profile</h1>
-        <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-          Your account and your child&apos;s information
-        </p>
-      </div>
+    <ERPShell role="parent" userName={profile.name}>
+      <div className="max-w-2xl mx-auto space-y-5">
+        {flash && (
+          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold ${flash.type === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}
+            style={{ fontFamily: "var(--font-nunito)" }}>
+            {flash.type === "ok" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {flash.msg}
+          </div>
+        )}
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-4">
         {/* Avatar */}
-        <div className="glass-card p-6 flex flex-col items-center text-center gap-3">
-          <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold text-white shadow-lg"
-            style={{ background: "linear-gradient(135deg,#d97706,#fbbf24)", fontFamily: "var(--font-nunito)" }}
-          >
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center gap-5">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
+            style={{ background: "#d97706", fontFamily: "var(--font-nunito)" }}>
             {initials}
           </div>
+          <div>
+            <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{profile.name}</h1>
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
+              style={{ background: "#d97706", fontFamily: "var(--font-nunito)" }}>PARENT</span>
+            <p className="text-xs text-gray-400 mt-1" style={{ fontFamily: "var(--font-nunito)" }}>
+              Member since {new Date(profile.createdAt).toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
+            </p>
+          </div>
+        </div>
 
-          {editing ? (
-            <div className="w-full space-y-2">
-              <input
-                className="w-full text-center text-sm font-bold text-navy border rounded-xl px-3 py-2 outline-none focus:ring-2"
-                style={{ borderColor: "rgba(217,119,6,0.4)", fontFamily: "var(--font-nunito)", background: "rgba(217,119,6,0.04)" }}
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSave()}
-                autoFocus
-              />
-              <div className="flex gap-2 justify-center">
-                <button onClick={handleSave} disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-opacity hover:opacity-90"
-                  style={{ background: "#6BCB77", fontFamily: "var(--font-nunito)" }}>
-                  <Check size={13} /> {saving ? "Saving…" : "Save"}
-                </button>
-                <button onClick={() => { setEditing(false); setEditName(displayName); }}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-opacity hover:opacity-70"
-                  style={{ background: "rgba(26,26,46,0.08)", color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-nunito)" }}>
-                  <X size={13} /> Cancel
-                </button>
+        {/* Child Info */}
+        {child && (
+          <div className="bg-amber-50 rounded-2xl p-6 shadow-sm border border-amber-100">
+            <h2 className="font-bold text-amber-800 text-sm mb-4" style={{ fontFamily: "var(--font-nunito)" }}>Your Child</h2>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold text-white flex-shrink-0"
+                style={{ background: "#d97706", fontFamily: "var(--font-nunito)" }}>
+                {child.name.charAt(0).toUpperCase()}
               </div>
-            </div>
-          ) : (
-            <>
-              <div>
-                <div className="flex items-center gap-2 justify-center">
-                  <p className="text-base font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{displayName}</p>
-                  <button onClick={() => setEditing(true)} title="Edit name"
-                    className="opacity-30 hover:opacity-70 transition-opacity">
-                    <Pencil size={13} className="text-navy" />
-                  </button>
+              <div className="flex-1 space-y-1.5">
+                <p className="font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{child.name}</p>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="flex items-center gap-1 text-xs text-amber-700" style={{ fontFamily: "var(--font-nunito)" }}>
+                    <GraduationCap size={12} /> {child.class}-{child.section}
+                  </span>
+                  {child.roll_no && (
+                    <span className="flex items-center gap-1 text-xs text-amber-700" style={{ fontFamily: "var(--font-nunito)" }}>
+                      <Hash size={12} /> Roll {child.roll_no}
+                    </span>
+                  )}
+                  {child.gender && (
+                    <span className="text-xs text-amber-700" style={{ fontFamily: "var(--font-nunito)" }}>{child.gender}</span>
+                  )}
+                  {child.dob && (
+                    <span className="text-xs text-amber-700" style={{ fontFamily: "var(--font-nunito)" }}>
+                      DOB: {new Date(child.dob).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  )}
                 </div>
-                {saved && (
-                  <p className="text-xs mt-0.5" style={{ color: "#6BCB77", fontFamily: "var(--font-inter)" }}>Name updated!</p>
-                )}
               </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-                style={{ background: "rgba(217,119,6,0.10)", color: "#d97706", fontFamily: "var(--font-nunito)" }}>
-                👨‍👩‍👧 Parent
-              </span>
-              <div className="w-full pt-3 border-t" style={{ borderColor: "rgba(26,26,46,0.07)" }}>
-                <p className="text-xs" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>Member since</p>
-                <p className="text-sm font-semibold text-navy mt-0.5" style={{ fontFamily: "var(--font-nunito)" }}>{memberSince}</p>
-              </div>
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
 
-        {/* Personal info */}
-        <div className="glass-card p-5">
-          <p className="text-sm font-bold text-navy mb-4" style={{ fontFamily: "var(--font-nunito)" }}>Personal Information</p>
-          <div className="space-y-4">
-            <InfoRow icon={<User size={15} />}    label="Full Name"    value={displayName} />
-            <InfoRow icon={<Phone size={15} />}   label="Phone (Login)" value={phone} />
-            <InfoRow icon={<Calendar size={15} />}label="Joined"        value={memberSince} />
-            <InfoRow icon={<GraduationCap size={15} />} label="Role"   value="Parent / Guardian" />
+        {/* Account Info */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <h2 className="font-bold text-navy text-sm" style={{ fontFamily: "var(--font-nunito)" }}>Account Info</h2>
+          <div className="flex items-center gap-3 py-2 border-b border-gray-50">
+            <Mail size={16} className="text-gray-400 flex-shrink-0" />
+            <div>
+              <p className="text-xs text-gray-400" style={{ fontFamily: "var(--font-nunito)" }}>Email</p>
+              <p className="text-sm font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{profile.email}</p>
+            </div>
           </div>
         </div>
 
-        {/* Child info */}
-        <div className="glass-card p-5">
-          <p className="text-sm font-bold text-navy mb-4" style={{ fontFamily: "var(--font-nunito)" }}>Child Information</p>
-          {child ? (
-            <div className="space-y-4">
-              <InfoRow icon={<User size={15} />}        label="Child's Name" value={child.name}                          color="#6BCB77" />
-              <InfoRow icon={<BookOpen size={15} />}    label="Class"        value={`${child.class} — Section ${child.section}`} color="#6BCB77" />
-              <InfoRow icon={<Hash size={15} />}        label="Roll Number"  value={child.roll_no || "—"}                color="#6BCB77" />
-              <InfoRow icon={<ClipboardList size={15} />}label="Academic Year" value="2026 – 27"                         color="#6BCB77" />
+        {/* Edit */}
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-4">
+          <h2 className="font-bold text-navy text-sm" style={{ fontFamily: "var(--font-nunito)" }}>Edit Profile</h2>
+          <div>
+            <label className="text-xs font-bold text-gray-600 block mb-1" style={{ fontFamily: "var(--font-nunito)" }}>Full Name</label>
+            <div className="relative">
+              <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={name} onChange={e => setName(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm" style={{ fontFamily: "var(--font-nunito)" }}
+                placeholder="Your full name" />
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: "rgba(107,203,119,0.10)" }}>
-                <BookOpen size={18} style={{ color: "#6BCB77" }} />
-              </div>
-              <p className="text-xs text-center" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
-                Loading child information…
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {stats.map(s => (
-          <div key={s.label} className="glass-card p-4">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3"
-              style={{ background: `${s.color}18`, color: s.color }}>
-              {s.icon}
-            </div>
-            <p className="text-2xl font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{s.value}</p>
-            <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>{s.label}</p>
           </div>
-        ))}
+          <div>
+            <label className="text-xs font-bold text-gray-600 block mb-1" style={{ fontFamily: "var(--font-nunito)" }}>Phone Number</label>
+            <div className="relative">
+              <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={phone} onChange={e => setPhone(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm" style={{ fontFamily: "var(--font-nunito)" }}
+                placeholder="+91 XXXXX XXXXX" />
+            </div>
+          </div>
+          <button onClick={handleSave} disabled={saving}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+            style={{ background: "#d97706", fontFamily: "var(--font-nunito)" }}>
+            {saving ? "Saving…" : "Save Changes"}
+          </button>
+        </div>
       </div>
     </ERPShell>
   );

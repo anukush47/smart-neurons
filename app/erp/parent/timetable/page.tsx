@@ -1,235 +1,165 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
-
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+import { createClient } from "@/lib/supabase/client";
+import { Clock, BookOpen, Calendar } from "lucide-react";
 
 interface Period {
   time: string;
   subject: string;
   teacher: string;
-  isBreak: boolean;
 }
 
-const SUBJECT_COLOR: Record<string, { color: string; bg: string }> = {
-  "English":            { color: "#d97706", bg: "rgba(217,119,6,0.10)" },
-  "Hindi":              { color: "#7c3aed", bg: "rgba(124,58,237,0.10)" },
-  "Mathematics":        { color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
-  "EVS":                { color: "#FF6B6B", bg: "rgba(255,107,107,0.10)" },
-  "Art & Craft":        { color: "#d97706", bg: "rgba(255,217,61,0.15)" },
-  "GK":                 { color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
-  "Music":              { color: "#6BCB77", bg: "rgba(107,203,119,0.08)" },
-  "Physical Education": { color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
-  "Break":              { color: "rgba(26,26,46,0.35)", bg: "rgba(26,26,46,0.05)" },
-  "Assembly":           { color: "#d97706", bg: "rgba(217,119,6,0.08)" },
-  "Free Play":          { color: "#6BCB77", bg: "rgba(107,203,119,0.08)" },
-  "Story Time":         { color: "#7c3aed", bg: "rgba(124,58,237,0.08)" },
+interface DaySchedule {
+  day: string;
+  periods: Period[];
+}
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const SUBJECT_COLOR: Record<string, string> = {
+  English: "#6BCB77", Hindi: "#FF6B6B", Maths: "#4D96FF",
+  EVS: "#FFD93D", Drawing: "#FF922B", Music: "#CC5DE8",
+  "Physical Education": "#20C997", Play: "#F06595",
 };
 
-const SUBJECT_EMOJI: Record<string, string> = {
-  "English": "📖", "Hindi": "📝", "Mathematics": "🔢", "EVS": "🌿",
-  "Art & Craft": "🎨", "GK": "🧠", "Music": "🎵",
-  "Physical Education": "⚽", "Break": "🍎", "Assembly": "🏫",
-  "Free Play": "🧸", "Story Time": "📚",
-};
-
-type DayKey = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday";
-
-const SCHEDULE: Record<DayKey, Period[]> = {
-  Monday: [
-    { time: "8:00–8:30",  subject: "Assembly",    teacher: "",                  isBreak: false },
-    { time: "8:30–9:00",  subject: "English",      teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "9:00–9:30",  subject: "Mathematics",  teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "9:30–10:00", subject: "Hindi",        teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "10:00–10:20",subject: "Break",        teacher: "",                  isBreak: true  },
-    { time: "10:20–11:00",subject: "EVS",          teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "11:00–11:40",subject: "Art & Craft",  teacher: "Ms. Deepa Iyer",   isBreak: false },
-    { time: "11:40–12:20",subject: "Free Play",    teacher: "",                  isBreak: false },
-  ],
-  Tuesday: [
-    { time: "8:00–8:30",  subject: "Assembly",    teacher: "",                  isBreak: false },
-    { time: "8:30–9:00",  subject: "Hindi",        teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "9:00–9:30",  subject: "English",      teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "9:30–10:00", subject: "Mathematics",  teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "10:00–10:20",subject: "Break",        teacher: "",                  isBreak: true  },
-    { time: "10:20–11:00",subject: "Music",        teacher: "Mr. Suresh Kumar",  isBreak: false },
-    { time: "11:00–11:40",subject: "Story Time",   teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "11:40–12:20",subject: "Free Play",    teacher: "",                  isBreak: false },
-  ],
-  Wednesday: [
-    { time: "8:00–8:30",  subject: "Assembly",    teacher: "",                  isBreak: false },
-    { time: "8:30–9:00",  subject: "English",      teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "9:00–9:30",  subject: "EVS",          teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "9:30–10:00", subject: "Hindi",        teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "10:00–10:20",subject: "Break",        teacher: "",                  isBreak: true  },
-    { time: "10:20–11:00",subject: "Mathematics",  teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "11:00–11:40",subject: "Art & Craft",  teacher: "Ms. Deepa Iyer",   isBreak: false },
-    { time: "11:40–12:20",subject: "Free Play",    teacher: "",                  isBreak: false },
-  ],
-  Thursday: [
-    { time: "8:00–8:30",  subject: "Assembly",    teacher: "",                  isBreak: false },
-    { time: "8:30–9:00",  subject: "Mathematics",  teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "9:00–9:30",  subject: "Hindi",        teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "9:30–10:00", subject: "English",      teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "10:00–10:20",subject: "Break",        teacher: "",                  isBreak: true  },
-    { time: "10:20–11:00",subject: "GK",           teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "11:00–11:40",subject: "Story Time",   teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "11:40–12:20",subject: "Free Play",    teacher: "",                  isBreak: false },
-  ],
-  Friday: [
-    { time: "8:00–8:30",  subject: "Assembly",    teacher: "",                  isBreak: false },
-    { time: "8:30–9:00",  subject: "English",      teacher: "Ms. Priya Sharma",  isBreak: false },
-    { time: "9:00–9:30",  subject: "Hindi",        teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "9:30–10:00", subject: "EVS",          teacher: "Ms. Rekha Nair",    isBreak: false },
-    { time: "10:00–10:20",subject: "Break",        teacher: "",                  isBreak: true  },
-    { time: "10:20–11:00",subject: "Physical Education", teacher: "Mr. Arjun Menon", isBreak: false },
-    { time: "11:00–11:40",subject: "Art & Craft",  teacher: "Ms. Deepa Iyer",   isBreak: false },
-    { time: "11:40–12:20",subject: "Free Play",    teacher: "",                  isBreak: false },
-  ],
-};
-
-const TODAY_DAY = "Wednesday" as DayKey;
+function subjectColor(subject: string) {
+  for (const key of Object.keys(SUBJECT_COLOR)) {
+    if (subject?.toLowerCase().includes(key.toLowerCase())) return SUBJECT_COLOR[key];
+  }
+  return "#94a3b8";
+}
 
 export default function ParentTimetablePage() {
-  const [user, setUser] = useState("");
-  const [activeDay, setActiveDay] = useState<DayKey>(TODAY_DAY);
+  const [user, setUser] = useState<{ name: string } | null>(null);
+  const [childInfo, setChildInfo] = useState<{ name: string; class: string; section: string } | null>(null);
+  const [schedule, setSchedule] = useState<DaySchedule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [activeDay, setActiveDay] = useState(() => {
+    const d = new Date().getDay();
+    return d === 0 ? "Monday" : d === 6 ? "Saturday" : DAYS[d - 1];
+  });
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      setUser(user.user_metadata?.name || "Parent");
-    });
+    async function load() {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) { setLoading(false); return; }
+      setUser({ name: data.user.app_metadata?.name || data.user.email || "Parent" });
+
+      const res = await fetch("/api/timetable/my-child");
+      const json = await res.json();
+
+      if (json.error) {
+        if (res.status !== 404) setError(json.error);
+        setLoading(false);
+        return;
+      }
+
+      if (json.student) {
+        setChildInfo({
+          name: json.student.name || "Your Child",
+          class: json.student.class,
+          section: json.student.section || "A",
+        });
+      }
+
+      const rows = json.timetable ?? [];
+      const byDay: Record<string, Period[]> = {};
+      for (const row of rows) byDay[row.day] = row.periods ?? [];
+      setSchedule(DAYS.map(day => ({ day, periods: byDay[day] ?? [] })));
+      setLoading(false);
+    }
+    load();
   }, []);
 
-  const periods = SCHEDULE[activeDay];
-  const subjectCounts: Record<string, number> = {};
-  Object.values(SCHEDULE).forEach(day =>
-    day.forEach(p => { if (!p.isBreak) subjectCounts[p.subject] = (subjectCounts[p.subject] || 0) + 1; })
-  );
+  const todaySchedule = schedule.find(s => s.day === activeDay);
 
   return (
-    <ERPShell role="parent" userName={user}>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>Timetable</h1>
-        <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-          Aarav Sharma · JKG-A · Academic Year 2026–27
-        </p>
-      </div>
+    <ERPShell role="parent" userName={user?.name}>
+      <div className="max-w-3xl mx-auto space-y-5">
+        <div>
+          <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>Timetable</h1>
+          {childInfo && (
+            <p className="text-sm text-gray-500 mt-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
+              {childInfo.name} · <span className="font-bold text-amber-600">{childInfo.class}-{childInfo.section}</span>
+            </p>
+          )}
+        </div>
 
-      {/* Day selector */}
-      <div className="flex gap-2 mb-5 overflow-x-auto pb-1">
-        {DAYS.map(d => {
-          const isToday = d === TODAY_DAY;
-          const active = d === activeDay;
-          return (
-            <button key={d} type="button" onClick={() => setActiveDay(d as DayKey)}
-              className="flex flex-col items-center px-4 py-2.5 rounded-xl flex-shrink-0 transition-all"
+        <div className="flex gap-2 flex-wrap">
+          {DAYS.map(day => (
+            <button key={day} onClick={() => setActiveDay(day)}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
               style={{
-                background: active ? "rgba(217,119,6,0.12)" : "rgba(26,26,46,0.05)",
-                border: active ? "1.5px solid rgba(217,119,6,0.30)" : isToday ? "1.5px solid rgba(217,119,6,0.15)" : "1.5px solid transparent",
-                minWidth: 68,
+                fontFamily: "var(--font-nunito)",
+                background: activeDay === day ? "#d97706" : "rgba(26,26,46,0.06)",
+                color: activeDay === day ? "white" : "rgba(26,26,46,0.60)",
               }}>
-              <span className="text-xs font-bold" style={{ color: active ? "#d97706" : "rgba(26,26,46,0.50)", fontFamily: "var(--font-nunito)" }}>
-                {d.slice(0, 3)}
-              </span>
-              {isToday && (
-                <span className="text-xs mt-0.5 px-1.5 rounded-full"
-                  style={{ background: "rgba(217,119,6,0.15)", color: "#d97706", fontSize: "0.6rem", fontFamily: "var(--font-nunito)", fontWeight: 700 }}>
-                  Today
-                </span>
-              )}
+              {day.slice(0, 3)}
             </button>
-          );
-        })}
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-4">
-        {/* Day schedule */}
-        <div className="lg:col-span-2 space-y-2">
-          {periods.map((p, i) => {
-            const sc = SUBJECT_COLOR[p.subject] || { color: "rgba(26,26,46,0.45)", bg: "rgba(26,26,46,0.05)" };
-            const emoji = SUBJECT_EMOJI[p.subject] || "📌";
-            return (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-                style={{
-                  background: p.isBreak ? "rgba(26,26,46,0.03)" : sc.bg,
-                  border: `1.5px solid ${p.isBreak ? "rgba(26,26,46,0.06)" : sc.color + "28"}`,
-                }}>
-                <span className="text-xs w-24 flex-shrink-0 font-mono" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>
-                  {p.time}
-                </span>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
-                  style={{ background: p.isBreak ? "rgba(26,26,46,0.06)" : `${sc.color}15` }}>
-                  {emoji}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold" style={{ color: p.isBreak ? "rgba(26,26,46,0.40)" : sc.color, fontFamily: "var(--font-nunito)" }}>
-                    {p.subject}
-                  </p>
-                  {p.teacher && (
-                    <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>
-                      {p.teacher}
-                    </p>
-                  )}
-                </div>
-                {p.isBreak && (
-                  <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={{ background: "rgba(26,26,46,0.07)", color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-nunito)" }}>
-                    Break
-                  </span>
-                )}
-              </div>
-            );
-          })}
+          ))}
         </div>
 
-        {/* Sidebar: weekly subject frequency */}
-        <div className="space-y-3">
-          <div className="glass-card p-4">
-            <p className="text-sm font-bold text-navy mb-3" style={{ fontFamily: "var(--font-nunito)" }}>Weekly Subject Load</p>
-            <div className="space-y-2">
-              {Object.entries(subjectCounts)
-                .filter(([s]) => s !== "Assembly" && s !== "Free Play")
-                .sort((a, b) => b[1] - a[1])
-                .map(([subject, count]) => {
-                  const sc = SUBJECT_COLOR[subject] || { color: "rgba(26,26,46,0.50)", bg: "rgba(26,26,46,0.05)" };
-                  const emoji = SUBJECT_EMOJI[subject] || "📌";
-                  return (
-                    <div key={subject} className="flex items-center gap-2">
-                      <span className="text-sm flex-shrink-0">{emoji}</span>
-                      <p className="flex-1 text-xs font-semibold truncate" style={{ color: "rgba(26,26,46,0.65)", fontFamily: "var(--font-nunito)" }}>{subject}</p>
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: count }).map((_, i) => (
-                          <div key={i} className="w-2 h-2 rounded-full" style={{ background: sc.color }} />
-                        ))}
-                      </div>
-                      <span className="text-xs font-bold w-4 text-right" style={{ color: sc.color, fontFamily: "var(--font-nunito)" }}>{count}x</span>
+        {loading ? (
+          <div className="text-center py-16 text-gray-400" style={{ fontFamily: "var(--font-nunito)" }}>Loading timetable…</div>
+        ) : error ? (
+          <div className="bg-amber-50 rounded-2xl p-6 text-center text-amber-600 text-sm" style={{ fontFamily: "var(--font-nunito)" }}>
+            {error || "No student linked to your account. Please contact admin."}
+          </div>
+        ) : !todaySchedule || todaySchedule.periods.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100">
+            <Calendar size={36} className="mx-auto text-gray-300 mb-3" />
+            <p className="font-bold text-gray-500" style={{ fontFamily: "var(--font-nunito)" }}>No schedule for {activeDay}</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {todaySchedule.periods.map((p, i) => {
+              const color = subjectColor(p.subject);
+              return (
+                <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-sm"
+                    style={{ background: color, fontFamily: "var(--font-nunito)" }}>
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-navy text-sm" style={{ fontFamily: "var(--font-nunito)" }}>{p.subject || "—"}</p>
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
+                      {p.time && (
+                        <span className="flex items-center gap-1 text-xs text-gray-500" style={{ fontFamily: "var(--font-nunito)" }}>
+                          <Clock size={11} /> {p.time}
+                        </span>
+                      )}
+                      {p.teacher && (
+                        <span className="text-xs text-gray-400" style={{ fontFamily: "var(--font-nunito)" }}>by {p.teacher}</span>
+                      )}
                     </div>
-                  );
-                })}
-            </div>
-          </div>
-
-          <div className="glass-card p-4" style={{ border: "1.5px solid rgba(217,119,6,0.18)" }}>
-            <p className="text-sm font-bold text-navy mb-2" style={{ fontFamily: "var(--font-nunito)" }}>School Timings</p>
-            <div className="space-y-1.5">
-              {[
-                { label: "School Opens", time: "8:00 AM" },
-                { label: "Lunch / Break", time: "10:00 AM" },
-                { label: "School Closes", time: "12:20 PM" },
-                { label: "Bus Pickup (PM)", time: "12:30 PM" },
-              ].map(item => (
-                <div key={item.label} className="flex items-center justify-between">
-                  <span className="text-xs" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>{item.label}</span>
-                  <span className="text-xs font-bold" style={{ color: "#d97706", fontFamily: "var(--font-nunito)" }}>{item.time}</span>
+                  </div>
+                  <BookOpen size={16} className="text-gray-300 flex-shrink-0" />
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && !error && todaySchedule && todaySchedule.periods.length > 0 && (
+          <div className="bg-amber-50 rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold"
+              style={{ fontFamily: "var(--font-nunito)" }}>
+              {todaySchedule.periods.length}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-800" style={{ fontFamily: "var(--font-nunito)" }}>
+                {todaySchedule.periods.length} periods on {activeDay}
+              </p>
+              <p className="text-xs text-amber-600 mt-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
+                {todaySchedule.periods.map(p => p.subject).filter(Boolean).join(" · ")}
+              </p>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </ERPShell>
   );

@@ -41,6 +41,9 @@ export async function GET(request: Request) {
   if (termFilter) query = query.eq("term", termFilter);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    if (error.code === "42P01") return NextResponse.json({ syllabus: [] });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ syllabus: data ?? [] });
 }

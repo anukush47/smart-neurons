@@ -72,27 +72,31 @@ export default function ParentAttendancePage() {
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
   const [liveAttendance, setLiveAttendance] = useState<{ date: string; status: string }[]>([]);
   const [childName, setChildName] = useState<string | null>(null);
+  const [childClass, setChildClass] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Auth once
   useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUser(user.user_metadata?.name || "Parent");
-
-      try {
-        const res = await fetch("/api/attendance/my-child");
-        if (res.ok) {
-          const { attendance, student } = await res.json();
-          if (attendance.length > 0) setLiveAttendance(attendance);
-          if (student) setChildName(student.name);
-        }
-      } catch {
-        setFetchError("Could not load live attendance.");
-      }
-    })();
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUser(user.user_metadata?.name || "Parent");
+    });
   }, []);
+
+  // Re-fetch attendance whenever the displayed month changes
+  useEffect(() => {
+    const monthStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}`;
+    fetch(`/api/attendance/my-child?month=${monthStr}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.attendance) setLiveAttendance(data.attendance);
+        if (data.student) {
+          setChildName(data.student.name);
+          setChildClass(`${data.student.class}-${data.student.section}`);
+        }
+      })
+      .catch(() => setFetchError("Could not load live attendance."));
+  }, [viewYear, viewMonth]);
 
   // Build calendar data: prefer live DB records over synthetic mock data
   const calendarData = useMemo(() => {
@@ -178,7 +182,7 @@ export default function ParentAttendancePage() {
           )}
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-          JKG-A · Academic Year 2026–27
+          {childClass ?? "—"} · Academic Year 2025–26
         </p>
       </div>
 

@@ -3,137 +3,108 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
-import { CheckCircle, XCircle, Clock, BookOpen, ChevronDown, ChevronUp, Save, Lock, Users } from "lucide-react";
+import { CheckCircle, AlertCircle, Save, Lock, Users } from "lucide-react";
 
 type AttStatus = "P" | "A" | "L" | "-";
 
-interface Student {
-  id: number;
-  name: string;
-  roll: number;
-  status: AttStatus;
-}
-
-interface Period {
-  id: number;
-  time: string;
-  subject: string;
-  class: string;
-  room: string;
-  totalStudents: number;
-  locked: boolean;
-  students: Student[];
-}
-
-// Real student names — 3 per class (Nursery/LKG/UKG/JKG/SKG)
-const STUDENTS_BY_CLASS: Record<string, string[]> = {
-  "Nursery-A": ["Aarav Sharma", "Priya Verma", "Rohan Patel"],
-  "LKG-A":     ["Sneha Gupta", "Aditya Singh", "Kavya Nair"],
-  "UKG-A":     ["Rahul Mehta", "Ananya Das", "Vivek Joshi"],
-  "JKG-A":     ["Isha Kapoor", "Arjun Rao", "Meera Iyer"],
-  "SKG-A":     ["Siddharth Jain", "Pooja Malhotra", "Kunal Mishra"],
-};
-const INDIAN_NAMES = Object.values(STUDENTS_BY_CLASS).flat();
-
-function makeStudents(count: number, offset = 0): Student[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: offset + i + 1,
-    name: INDIAN_NAMES[(offset + i) % INDIAN_NAMES.length],
-    roll: i + 1,
-    status: "-" as AttStatus,
-  }));
-}
-
-function makeStudentsForClass(cls: string): Student[] {
-  const names = STUDENTS_BY_CLASS[cls] ?? INDIAN_NAMES.slice(0, 3);
-  return names.map((name, i) => ({ id: i + 1, name, roll: i + 1, status: "-" as AttStatus }));
-}
-
-const initialPeriods: Period[] = [
-  { id: 1, time: "8:00 – 8:40 AM",   subject: "English & Phonics", class: "Nursery-A", room: "101", totalStudents: 3, locked: false, students: makeStudentsForClass("Nursery-A") },
-  { id: 2, time: "8:45 – 9:25 AM",   subject: "Maths Concepts",    class: "LKG-A",     room: "102", totalStudents: 3, locked: false, students: makeStudentsForClass("LKG-A") },
-  { id: 3, time: "9:30 – 10:10 AM",  subject: "English & Rhymes",  class: "UKG-A",     room: "103", totalStudents: 3, locked: false, students: makeStudentsForClass("UKG-A") },
-  { id: 4, time: "10:30 – 11:10 AM", subject: "Hindi & Drawing",   class: "JKG-A",     room: "104", totalStudents: 3, locked: false, students: makeStudentsForClass("JKG-A") },
-  { id: 5, time: "11:15 – 11:55 AM", subject: "EVS & Activity",    class: "SKG-A",     room: "105", totalStudents: 3, locked: false, students: makeStudentsForClass("SKG-A") },
-];
-
-const STATUS_CONFIG: Record<AttStatus, { label: string; bg: string; color: string; icon?: React.ReactNode }> = {
-  "P": { label: "Present", bg: "rgba(107,203,119,0.15)", color: "#6BCB77" },
-  "A": { label: "Absent",  bg: "rgba(255,107,107,0.12)", color: "#FF6B6B" },
-  "L": { label: "Late",    bg: "rgba(255,217,61,0.15)",  color: "#d97706" },
+const STATUS_CFG: Record<AttStatus, { label: string; bg: string; color: string }> = {
+  P:   { label: "Present", bg: "rgba(107,203,119,0.15)", color: "#6BCB77" },
+  A:   { label: "Absent",  bg: "rgba(255,107,107,0.12)", color: "#FF6B6B" },
+  L:   { label: "Late",    bg: "rgba(255,217,61,0.15)",  color: "#d97706" },
   "-": { label: "—",       bg: "rgba(26,26,46,0.05)",    color: "rgba(26,26,46,0.30)" },
 };
 
+function toMark(s: string): AttStatus {
+  if (s === "present") return "P";
+  if (s === "absent")  return "A";
+  if (s === "late")    return "L";
+  return "-";
+}
+
+interface DbStudent { id: string; name: string; roll_no: string; }
+
 export default function FacultyAttendancePage() {
-  const [user, setUser] = useState("");
-  const [periods, setPeriods] = useState<Period[]>(initialPeriods);
-  const [expanded, setExpanded] = useState<number | null>(2);
-  const [saved, setSaved] = useState<Record<number, boolean>>({});
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
-  const [saving, setSaving] = useState<number | null>(null);
+  const [userName, setUserName] = useState("");
+  const [classAssigned, setClassAssigned] = useState("");
+  const [classLabel, setClassLabel] = useState("");
+
+  const [students, setStudents] = useState<DbStudent[]>([]);
+  const [marks, setMarks] = useState<Record<string, AttStatus>>({});
+  const [locked, setLocked] = useState(false);
+
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [attLoading, setAttLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [flashSaved, setFlashSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [dbStudents, setDbStudents] = useState<Record<string, { id: string; name: string; roll_no: string }[]>>({});
-  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
 
+  // Load auth + students once
   useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+    const sb = createClient();
+    sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
-      setUser(user.user_metadata?.name || "Faculty");
+      setUserName(user.app_metadata?.name || user.user_metadata?.name || "Faculty");
+      const ca: string = user.app_metadata?.class_assigned ?? "";
+      setClassAssigned(ca);
+      setClassLabel(ca.replace("-", " "));
+      if (!ca) { setStudentsLoading(false); return; }
 
-      setStudentsLoading(true);
-      const classes = [...new Set(initialPeriods.map(p => p.class))];
-      const results: Record<string, { id: string; name: string; roll_no: string }[]> = {};
-      await Promise.all(
-        classes.map(async cls => {
-          try {
-            const res = await fetch(`/api/students?class=${encodeURIComponent(cls)}`);
-            if (res.ok) {
-              const { students } = await res.json() as { students: { id: string; name: string; roll_no: string }[] };
-              results[cls] = students;
-            }
-          } catch { /* keep empty */ }
-        })
-      );
-      setDbStudents(results);
+      const res = await fetch(`/api/students?class=${encodeURIComponent(ca)}`);
+      const data = await res.json();
+      if (data.students) setStudents(data.students as DbStudent[]);
       setStudentsLoading(false);
-    })();
+    });
   }, []);
 
-  function setStatus(periodId: number, studentId: number, status: AttStatus) {
-    setPeriods(prev =>
-      prev.map(p =>
-        p.id !== periodId ? p : {
-          ...p,
-          students: p.students.map(s =>
-            s.id !== studentId ? s : { ...s, status }
-          ),
-        }
-      )
-    );
+  // Reload attendance marks whenever date or class changes (and students are loaded)
+  useEffect(() => {
+    if (!classAssigned || students.length === 0) return;
+    setAttLoading(true);
+    setLocked(false);
+    setSaveError(null);
+    fetch(`/api/attendance?date=${selectedDate}&class=${encodeURIComponent(classAssigned)}`)
+      .then(r => r.json())
+      .then(data => {
+        const list: { student_id: string; status: string }[] = data.attendance ?? [];
+        const newMarks: Record<string, AttStatus> = {};
+        for (const a of list) newMarks[a.student_id] = toMark(a.status);
+        setMarks(newMarks);
+        if (list.length > 0 && list.length >= students.length) setLocked(true);
+      })
+      .finally(() => setAttLoading(false));
+  }, [selectedDate, classAssigned, students.length]);
+
+  // Derived display rows
+  const rows = students.map(s => ({ ...s, status: marks[s.id] ?? "-" as AttStatus }));
+  const present  = rows.filter(r => r.status === "P").length;
+  const absent   = rows.filter(r => r.status === "A").length;
+  const late     = rows.filter(r => r.status === "L").length;
+  const unmarked = rows.filter(r => r.status === "-").length;
+  const pct = students.length > 0 ? Math.round((present / students.length) * 100) : 0;
+
+  function setMark(id: string, st: AttStatus) {
+    setMarks(prev => ({ ...prev, [id]: prev[id] === st ? "-" : st }));
   }
 
-  function markAll(periodId: number, status: "P" | "A") {
-    setPeriods(prev =>
-      prev.map(p =>
-        p.id !== periodId ? p : {
-          ...p,
-          students: p.students.map(s => ({ ...s, status })),
-        }
-      )
-    );
+  function markAll(st: "P" | "A") {
+    const next: Record<string, AttStatus> = {};
+    for (const s of students) next[s.id] = st;
+    setMarks(next);
   }
 
-  async function handleSave(periodId: number, lock = true) {
-    const period = periods.find(p => p.id === periodId);
-    if (!period) return;
-    const unmarked = period.students.filter(s => s.status === "-");
-    if (unmarked.length > 0) {
-      setSaveError(`${unmarked.length} student(s) not marked in ${period.class}`);
+  async function handleSave(lock = true) {
+    const toSend = lock
+      ? rows
+      : rows.filter(r => r.status !== "-");
+
+    if (lock && unmarked > 0) {
+      setSaveError(`${unmarked} student${unmarked !== 1 ? "s" : ""} not yet marked`);
       return;
     }
-    setSaving(periodId);
+    if (toSend.length === 0) return;
+
+    setSaving(true);
     setSaveError(null);
     try {
       const res = await fetch("/api/attendance", {
@@ -141,280 +112,213 @@ export default function FacultyAttendancePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: selectedDate,
-          class: period.class,
-          records: period.students.map((s, idx) => {
-            // Use real DB UUID if available for this class, else fall back to mock id
-            const dbStudent = (dbStudents[period.class] ?? [])[idx];
-            return {
-              student_id: dbStudent?.id ?? String(s.id),
-              status: s.status === "P" ? "present" : s.status === "A" ? "absent" : "late",
-            };
-          }),
+          class: classAssigned,
+          records: toSend.map(r => ({
+            student_id: r.id,
+            status: r.status === "P" ? "present" : r.status === "A" ? "absent" : "late",
+          })),
         }),
       });
       if (!res.ok) {
-        const { error } = await res.json();
-        setSaveError(error || "Failed to save");
+        const err = await res.json();
+        setSaveError(err.error || "Failed to save");
         return;
       }
-      if (lock) {
-        setPeriods(prev => prev.map(p => p.id === periodId ? { ...p, locked: true } : p));
-      }
-      setSaved(prev => ({ ...prev, [periodId]: true }));
-      setTimeout(() => setSaved(prev => ({ ...prev, [periodId]: false })), 2500);
+      if (lock) setLocked(true);
+      setFlashSaved(true);
+      setTimeout(() => setFlashSaved(false), 2500);
     } finally {
-      setSaving(null);
+      setSaving(false);
     }
   }
 
-  const todayLabel = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-
   return (
-    <ERPShell role="faculty" userName={user}>
-      {/* Header */}
+    <ERPShell role="faculty" userName={userName}>
       <div className="mb-6">
         <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>
-          Attendance — My Classes
+          Attendance {classLabel ? `— ${classLabel}` : ""}
         </h1>
         <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-          {todayLabel}
+          {new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
         </p>
       </div>
 
-      {/* Summary strip */}
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Periods Today",   value: initialPeriods.length,                     color: "#7c3aed", bg: "rgba(167,139,250,0.10)" },
-          { label: "Submitted",       value: periods.filter(p => p.locked).length,       color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
-          { label: "Pending",         value: periods.filter(p => !p.locked).length,      color: "#d97706", bg: "rgba(255,217,61,0.12)"  },
-          { label: "Total Students",  value: periods.reduce((a, p) => a + p.totalStudents, 0), color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
+          { label: "Total",   value: students.length, color: "#7c3aed", bg: "rgba(167,139,250,0.10)" },
+          { label: "Present", value: present,          color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
+          { label: "Absent",  value: absent,           color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
+          { label: "Late",    value: late,             color: "#d97706", bg: "rgba(255,217,61,0.12)"  },
         ].map(s => (
           <div key={s.label} className="glass-card p-4">
             <p className="text-xs font-semibold mb-1" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>{s.label}</p>
-            <p className="text-2xl font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>{s.value}</p>
+            <p className="text-2xl font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>
+              {studentsLoading ? "…" : s.value}
+            </p>
           </div>
         ))}
       </div>
 
-      {/* Period list */}
-      <div className="flex items-center gap-3 mb-4">
+      {/* Date picker */}
+      <div className="flex items-center gap-3 mb-5">
         <label className="text-xs font-semibold" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-nunito)" }}>Date</label>
-        <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+        <input type="date" value={selectedDate}
+          onChange={e => setSelectedDate(e.target.value)}
           className="px-3 py-2 rounded-xl text-sm"
-          style={{ background: "rgba(26,26,46,0.04)", border: "1px solid rgba(26,26,46,0.09)", outline: "none", fontFamily: "var(--font-inter)", color: "rgba(26,26,46,0.80)" }} />
+          style={{ background: "rgba(26,26,46,0.04)", border: "1px solid rgba(26,26,46,0.09)", outline: "none", fontFamily: "var(--font-inter)", color: "rgba(26,26,46,0.80)" }}
+        />
+        {attLoading && <span className="text-xs" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>Loading…</span>}
+        {locked && (
+          <span className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full"
+            style={{ background: "rgba(107,203,119,0.12)", color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>
+            <CheckCircle size={12} /> Submitted
+          </span>
+        )}
       </div>
-      <div className="space-y-3">
-        {periods.map(period => {
-          const isOpen = expanded === period.id;
-          const present = period.students.filter(s => s.status === "P").length;
-          const absent  = period.students.filter(s => s.status === "A").length;
-          const late    = period.students.filter(s => s.status === "L").length;
-          const unmarked = period.students.filter(s => s.status === "-").length;
-          const pct = period.students.length > 0 ? Math.round((present / period.students.length) * 100) : 0;
 
-          return (
-            <div
-              key={period.id}
-              className="glass-card overflow-hidden"
-              style={{ border: period.locked ? "1.5px solid rgba(107,203,119,0.25)" : "1.5px solid rgba(255,255,255,0.60)" }}
-            >
-              {/* Period header row */}
-              <button
-                type="button"
-                className="w-full flex items-center gap-4 p-4 text-left"
-                onClick={() => setExpanded(isOpen ? null : period.id)}
-              >
-                {/* Time chip */}
-                <div
-                  className="flex-shrink-0 text-xs font-bold px-2.5 py-1.5 rounded-xl"
-                  style={{
-                    background: "rgba(124,58,237,0.08)",
-                    color: "#7c3aed",
-                    fontFamily: "var(--font-nunito)",
-                    minWidth: 96,
-                    textAlign: "center",
-                  }}
-                >
-                  {period.time}
-                </div>
-
-                {/* Subject + class */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-navy truncate" style={{ fontFamily: "var(--font-nunito)" }}>
-                    {period.subject}
-                    {period.locked && (
-                      <span className="ml-2 text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(107,203,119,0.12)", color: "#6BCB77" }}>
-                        Submitted
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-                    {period.class} · Room {period.room} · {period.totalStudents} students
-                  </p>
-                </div>
-
-                {/* Mini stats */}
-                <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
-                  {[
-                    { v: present, c: "#6BCB77" },
-                    { v: absent,  c: "#FF6B6B" },
-                    { v: late,    c: "#d97706" },
-                  ].map((x, i) => (
-                    <span key={i} className="text-xs font-bold" style={{ color: x.c, fontFamily: "var(--font-nunito)" }}>{x.v}</span>
-                  ))}
-                  {unmarked > 0 && (
-                    <span className="text-xs font-bold" style={{ color: "rgba(26,26,46,0.35)", fontFamily: "var(--font-nunito)" }}>
-                      {unmarked} left
-                    </span>
-                  )}
-                </div>
-
-                {isOpen ? <ChevronUp size={16} style={{ color: "rgba(26,26,46,0.40)", flexShrink: 0 }} /> : <ChevronDown size={16} style={{ color: "rgba(26,26,46,0.40)", flexShrink: 0 }} />}
+      <div className="glass-card overflow-hidden">
+        {/* Roll call toolbar */}
+        {!locked && !studentsLoading && students.length > 0 && (
+          <div className="flex items-center justify-between flex-wrap gap-3 px-4 pt-4 pb-3"
+            style={{ borderBottom: "1px solid rgba(26,26,46,0.06)" }}>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => markAll("P")}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all duration-150 hover:-translate-y-0.5"
+                style={{ background: "rgba(107,203,119,0.12)", color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>
+                <Users size={11} className="inline mr-1" /> All Present
               </button>
+              <button type="button" onClick={() => markAll("A")}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all duration-150 hover:-translate-y-0.5"
+                style={{ background: "rgba(255,107,107,0.10)", color: "#FF6B6B", fontFamily: "var(--font-nunito)" }}>
+                All Absent
+              </button>
+            </div>
+            <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
+              {present}P · {absent}A · {late}L · {unmarked} unmarked
+            </p>
+          </div>
+        )}
 
-              {/* Expanded body */}
-              {isOpen && (
-                <div className="px-4 pb-4 border-t" style={{ borderColor: "rgba(26,26,46,0.06)" }}>
-                  {!period.locked && (
-                    <div className="flex items-center justify-between flex-wrap gap-3 pt-4 pb-3">
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => markAll(period.id, "P")}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all duration-150 hover:-translate-y-0.5"
-                          style={{ background: "rgba(107,203,119,0.12)", color: "#6BCB77", fontFamily: "var(--font-nunito)" }}
-                        >
-                          All Present
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => markAll(period.id, "A")}
-                          className="text-xs font-semibold px-3 py-1.5 rounded-xl transition-all duration-150 hover:-translate-y-0.5"
-                          style={{ background: "rgba(255,107,107,0.10)", color: "#FF6B6B", fontFamily: "var(--font-nunito)" }}
-                        >
-                          All Absent
-                        </button>
-                      </div>
-                      <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
-                        {present}P · {absent}A · {late}L · {unmarked} unmarked
+        {/* Progress bar */}
+        {students.length > 0 && (
+          <div className="px-4 pt-3">
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(26,26,46,0.06)" }}>
+              <div className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${pct}%`, background: pct >= 80 ? "#6BCB77" : pct >= 60 ? "#d97706" : "#FF6B6B" }} />
+            </div>
+          </div>
+        )}
+
+        {/* Student list */}
+        <div className="p-4">
+          {studentsLoading ? (
+            <p className="text-sm text-center py-8" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
+              Loading students…
+            </p>
+          ) : students.length === 0 ? (
+            <div className="py-10 text-center">
+              <p className="text-sm font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>No class assigned</p>
+              <p className="text-xs mt-1" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
+                Contact admin to assign your class.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {rows.map((student, idx) => (
+                <div key={student.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl transition-colors"
+                  style={{ background: STATUS_CFG[student.status].bg }}>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
+                      style={{ background: "rgba(26,26,46,0.06)", color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-navy truncate" style={{ fontFamily: "var(--font-nunito)" }}>
+                        {student.name}
+                      </p>
+                      <p className="text-xs" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>
+                        {student.roll_no}
                       </p>
                     </div>
-                  )}
-
-                  {/* Progress bar */}
-                  <div className="h-1.5 rounded-full mb-4 overflow-hidden" style={{ background: "rgba(26,26,46,0.06)" }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${pct}%`,
-                        background: pct >= 80 ? "#6BCB77" : pct >= 60 ? "#d97706" : "#FF6B6B",
-                      }}
-                    />
                   </div>
 
-                  {/* Student grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-                    {period.students.map(student => (
-                      <div
-                        key={student.id}
-                        className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl"
-                        style={{ background: STATUS_CONFIG[student.status].bg }}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span
-                            className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-                            style={{ background: "rgba(26,26,46,0.06)", color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}
-                          >
-                            {student.roll}
-                          </span>
-                          <p className="text-sm font-semibold text-navy truncate" style={{ fontFamily: "var(--font-nunito)" }}>
-                            {student.name}
-                          </p>
-                        </div>
-
-                        {period.locked ? (
-                          <span
-                            className="text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0"
-                            style={{ background: STATUS_CONFIG[student.status].bg, color: STATUS_CONFIG[student.status].color, fontFamily: "var(--font-nunito)" }}
-                          >
-                            {student.status === "-" ? "—" : student.status}
-                          </span>
-                        ) : (
-                          <div className="flex gap-1 flex-shrink-0">
-                            {(["P", "A", "L"] as const).map(st => (
-                              <button
-                                key={st}
-                                type="button"
-                                onClick={() => setStatus(period.id, student.id, student.status === st ? "-" : st)}
-                                className="w-7 h-7 rounded-lg text-xs font-bold transition-all duration-150 hover:scale-105"
-                                style={{
-                                  background: student.status === st ? STATUS_CONFIG[st].bg : "rgba(26,26,46,0.05)",
-                                  color: student.status === st ? STATUS_CONFIG[st].color : "rgba(26,26,46,0.35)",
-                                  fontFamily: "var(--font-nunito)",
-                                  border: student.status === st ? `1px solid ${STATUS_CONFIG[st].color}40` : "1px solid transparent",
-                                }}
-                              >
-                                {st}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Action buttons */}
-                  {!period.locked && (
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleSave(period.id, false)}
-                        disabled={saving === period.id}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                        style={{
-                          background: saved[period.id] ? "rgba(107,203,119,0.15)" : "rgba(26,26,46,0.06)",
-                          color: saved[period.id] ? "#6BCB77" : "rgba(26,26,46,0.70)",
-                          fontFamily: "var(--font-nunito)",
-                        }}
-                      >
-                        <Save size={14} />
-                        {saving === period.id ? "Saving…" : saved[period.id] ? "Saved!" : "Save Draft"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSave(period.id)}
-                        disabled={unmarked > 0 || saving === period.id}
-                        className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                        style={{
-                          background: "linear-gradient(135deg, #6BCB77, #4CAF50)",
-                          boxShadow: "0 4px 14px rgba(107,203,119,0.30)",
-                          fontFamily: "var(--font-nunito)",
-                        }}
-                      >
-                        <Lock size={14} />
-                        {saving === period.id ? "Saving…" : `Submit & Lock${unmarked > 0 ? ` (${unmarked} left)` : ""}`}
-                      </button>
-                    </div>
-                  )}
-
-                  {period.locked && (
-                    <div
-                      className="flex items-center gap-2 text-sm font-semibold"
-                      style={{ color: "#6BCB77", fontFamily: "var(--font-nunito)" }}
-                    >
-                      <CheckCircle size={15} />
-                      Attendance submitted and locked for this period.
+                  {locked ? (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0"
+                      style={{ background: STATUS_CFG[student.status].bg, color: STATUS_CFG[student.status].color, fontFamily: "var(--font-nunito)" }}>
+                      {student.status === "-" ? "—" : STATUS_CFG[student.status].label}
+                    </span>
+                  ) : (
+                    <div className="flex gap-1 flex-shrink-0">
+                      {(["P", "A", "L"] as const).map(st => (
+                        <button key={st} type="button"
+                          onClick={() => setMark(student.id, st)}
+                          className="w-7 h-7 rounded-lg text-xs font-bold transition-all duration-150 hover:scale-105"
+                          style={{
+                            background: student.status === st ? STATUS_CFG[st].bg : "rgba(26,26,46,0.05)",
+                            color:      student.status === st ? STATUS_CFG[st].color : "rgba(26,26,46,0.35)",
+                            border: student.status === st ? `1px solid ${STATUS_CFG[st].color}40` : "1px solid transparent",
+                            fontFamily: "var(--font-nunito)",
+                          }}>
+                          {st}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
-              )}
+              ))}
             </div>
-          );
-        })}
+          )}
+        </div>
+
+        {/* Action row */}
+        {!studentsLoading && students.length > 0 && (
+          <div className="px-4 pb-4 flex flex-wrap items-center gap-3" style={{ borderTop: "1px solid rgba(26,26,46,0.06)" }}>
+            {locked ? (
+              <div className="flex items-center gap-2 text-sm font-semibold py-2"
+                style={{ color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>
+                <CheckCircle size={15} /> Attendance submitted and locked for this date.
+              </div>
+            ) : (
+              <>
+                <button type="button"
+                  onClick={() => handleSave(false)}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-60"
+                  style={{
+                    background: flashSaved ? "rgba(107,203,119,0.15)" : "rgba(26,26,46,0.06)",
+                    color: flashSaved ? "#6BCB77" : "rgba(26,26,46,0.70)",
+                    fontFamily: "var(--font-nunito)",
+                  }}>
+                  <Save size={14} />
+                  {saving ? "Saving…" : flashSaved ? "Saved!" : "Save Draft"}
+                </button>
+
+                <button type="button"
+                  onClick={() => handleSave(true)}
+                  disabled={unmarked > 0 || saving}
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                  style={{
+                    background: "linear-gradient(135deg, #6BCB77, #4CAF50)",
+                    boxShadow: "0 4px 14px rgba(107,203,119,0.30)",
+                    fontFamily: "var(--font-nunito)",
+                  }}>
+                  <Lock size={14} />
+                  {saving ? "Saving…" : `Submit & Lock${unmarked > 0 ? ` (${unmarked} left)` : ""}`}
+                </button>
+              </>
+            )}
+
+            {saveError && (
+              <div className="flex items-center gap-1.5">
+                <AlertCircle size={13} style={{ color: "#FF6B6B" }} />
+                <p className="text-xs" style={{ color: "#FF6B6B", fontFamily: "var(--font-inter)" }}>{saveError}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      {saveError && (
-        <p className="text-xs mt-2" style={{ color: "#FF6B6B", fontFamily: "var(--font-inter)" }}>{saveError}</p>
-      )}
     </ERPShell>
   );
 }

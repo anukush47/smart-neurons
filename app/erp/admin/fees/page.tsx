@@ -1,534 +1,392 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { createClient } from "@/lib/supabase/client";
 import ERPShell from "@/components/erp/ERPShell";
+import { createClient } from "@/lib/supabase/client";
 import {
-  Search, Filter, X, Download, CreditCard,
-  CheckCircle, AlertCircle, Clock, ChevronDown, ChevronUp,
-  TrendingUp, Users, IndianRupee,
+  IndianRupee, Search, Filter, CheckCircle, AlertCircle,
+  Clock, ChevronDown, ChevronUp, X, Users, TrendingUp,
 } from "lucide-react";
 
-type FeeStatus = "paid" | "due" | "partial" | "overdue";
-type PayMode = "Cash" | "UPI" | "Cheque" | "Online";
-
-interface Payment {
-  date: string;
-  amount: number;
-  mode: PayMode;
-  receipt: string;
+/* ── Types ───────────────────────────────────────────────── */
+interface FeePaymentRow {
+  id: string;
+  student_id: string;
+  amount_due: number;
+  amount_paid: number;
+  status: "pending" | "paid" | "overdue";
+  due_date: string;
+  paid_at: string | null;
+  receipt_no: string | null;
+  students: {
+    id: string; name: string; class: string;
+    section: string; roll_no: string | null;
+    parent_name: string | null; parent_phone: string | null;
+  };
+  fee_structures: {
+    id: string; name: string; term: string;
+    academic_year: string; amount: number; due_date: string;
+  };
 }
 
-interface FeeRecord {
-  id: number;
-  studentName: string;
-  rollNo: string;
+interface StudentSummary {
+  studentId: string;
+  name: string;
   class: string;
-  parentName: string;
-  parentPhone: string;
-  totalFee: number;
-  paidAmount: number;
-  status: FeeStatus;
-  dueDate: string;
-  payments: Payment[];
+  section: string;
+  rollNo: string | null;
+  parentName: string | null;
+  parentPhone: string | null;
+  totalDue: number;
+  totalPaid: number;
+  outstanding: number;
+  overallStatus: "paid" | "partial" | "due" | "overdue";
+  instalments: FeePaymentRow[];
 }
 
-const STATUS_STYLE: Record<FeeStatus, { label: string; bg: string; color: string }> = {
-  paid:    { label: "Paid",    bg: "rgba(107,203,119,0.12)", color: "#6BCB77" },
-  due:     { label: "Due",     bg: "rgba(255,107,107,0.12)", color: "#FF6B6B" },
+const STATUS_STYLE = {
+  paid:    { label: "Paid",    bg: "rgba(107,203,119,0.12)", color: "#16a34a" },
   partial: { label: "Partial", bg: "rgba(255,217,61,0.15)",  color: "#d97706" },
-  overdue: { label: "Overdue", bg: "rgba(255,107,107,0.18)", color: "#dc2626" },
+  due:     { label: "Due",     bg: "rgba(255,107,107,0.10)", color: "#FF6B6B" },
+  overdue: { label: "Overdue", bg: "rgba(220,38,38,0.12)",   color: "#dc2626" },
 };
 
-const CLASSES = ["All", "Playgroup", "Nursery", "JKG", "SKG"];
+const CLASSES = ["All", "Nursery", "LKG", "UKG", "JKG", "SKG"];
+const PAY_MODES = ["Cash", "UPI", "Cheque", "Online / NEFT"];
 
-const FEE_DATA: FeeRecord[] = [
-  { id: 1,  studentName: "Aarav Sharma",    rollNo: "SN006", class: "Nursery",   parentName: "Rohit Sharma",    parentPhone: "9871234560", totalFee: 54000, paidAmount: 54000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 18000, mode: "UPI",    receipt: "RC001" }, { date: "2026-05-01", amount: 18000, mode: "UPI",    receipt: "RC002" }, { date: "2026-06-01", amount: 18000, mode: "Online", receipt: "RC003" }] },
-  { id: 2,  studentName: "Diya Patel",      rollNo: "SN007", class: "Nursery",   parentName: "Nikhil Patel",    parentPhone: "9871234561", totalFee: 54000, paidAmount: 54000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 18000, mode: "Cash",   receipt: "RC004" }, { date: "2026-05-01", amount: 18000, mode: "Cash",   receipt: "RC005" }, { date: "2026-06-01", amount: 18000, mode: "UPI",    receipt: "RC006" }] },
-  { id: 3,  studentName: "Ishaan Gupta",    rollNo: "SN008", class: "Nursery",   parentName: "Manish Gupta",    parentPhone: "9871234562", totalFee: 54000, paidAmount: 36000, status: "due",     dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 18000, mode: "UPI",    receipt: "RC007" }, { date: "2026-05-01", amount: 18000, mode: "UPI",    receipt: "RC008" }] },
-  { id: 4,  studentName: "Priya Singh",     rollNo: "SN009", class: "Nursery",   parentName: "Anil Singh",      parentPhone: "9871234563", totalFee: 54000, paidAmount: 27000, status: "partial", dueDate: "2026-05-15", payments: [{ date: "2026-04-01", amount: 18000, mode: "Cheque", receipt: "RC009" }, { date: "2026-05-10", amount: 9000,  mode: "UPI",    receipt: "RC010" }] },
-  { id: 5,  studentName: "Arjun Verma",     rollNo: "SN010", class: "Nursery",   parentName: "Sunil Verma",     parentPhone: "9871234564", totalFee: 54000, paidAmount: 54000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 18000, mode: "Online", receipt: "RC011" }, { date: "2026-05-01", amount: 18000, mode: "Online", receipt: "RC012" }, { date: "2026-06-01", amount: 18000, mode: "Online", receipt: "RC013" }] },
-  { id: 6,  studentName: "Ananya Joshi",    rollNo: "SN017", class: "JKG",       parentName: "Amit Joshi",      parentPhone: "9869012340", totalFee: 60000, paidAmount: 60000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 20000, mode: "UPI",    receipt: "RC014" }, { date: "2026-05-01", amount: 20000, mode: "UPI",    receipt: "RC015" }, { date: "2026-06-01", amount: 20000, mode: "UPI",    receipt: "RC016" }] },
-  { id: 7,  studentName: "Vivaan Saxena",   rollNo: "SN018", class: "JKG",       parentName: "Pankaj Saxena",   parentPhone: "9869012341", totalFee: 60000, paidAmount: 60000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 20000, mode: "Cash",   receipt: "RC017" }, { date: "2026-05-01", amount: 20000, mode: "Cash",   receipt: "RC018" }, { date: "2026-06-01", amount: 20000, mode: "Cash",   receipt: "RC019" }] },
-  { id: 8,  studentName: "Ayaan Nair",      rollNo: "SN019", class: "JKG",       parentName: "Manoj Nair",      parentPhone: "9869012342", totalFee: 60000, paidAmount: 40000, status: "due",     dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 20000, mode: "UPI",    receipt: "RC020" }, { date: "2026-05-01", amount: 20000, mode: "Online", receipt: "RC021" }] },
-  { id: 9,  studentName: "Dhruv Agarwal",   rollNo: "SN021", class: "JKG",       parentName: "Vikas Agarwal",   parentPhone: "9869012344", totalFee: 60000, paidAmount: 20000, status: "overdue", dueDate: "2026-04-30", payments: [{ date: "2026-04-01", amount: 20000, mode: "Cheque", receipt: "RC022" }] },
-  { id: 10, studentName: "Saanvi Iyer",     rollNo: "SN031", class: "SKG",       parentName: "Ravi Iyer",       parentPhone: "9862109870", totalFee: 66000, paidAmount: 66000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 22000, mode: "Online", receipt: "RC023" }, { date: "2026-05-01", amount: 22000, mode: "Online", receipt: "RC024" }, { date: "2026-06-01", amount: 22000, mode: "Online", receipt: "RC025" }] },
-  { id: 11, studentName: "Krish Gupta",     rollNo: "SN032", class: "SKG",       parentName: "Hemant Gupta",    parentPhone: "9862109871", totalFee: 66000, paidAmount: 66000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 22000, mode: "UPI",    receipt: "RC026" }, { date: "2026-05-01", amount: 22000, mode: "UPI",    receipt: "RC027" }, { date: "2026-06-01", amount: 22000, mode: "UPI",    receipt: "RC028" }] },
-  { id: 12, studentName: "Tarini Bhatt",    rollNo: "SN033", class: "SKG",       parentName: "Ashish Bhatt",    parentPhone: "9862109872", totalFee: 66000, paidAmount: 44000, status: "due",     dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 22000, mode: "Cash",   receipt: "RC029" }, { date: "2026-05-01", amount: 22000, mode: "Cash",   receipt: "RC030" }] },
-  { id: 13, studentName: "Myra Kapoor",     rollNo: "SN001", class: "Playgroup", parentName: "Rajan Kapoor",    parentPhone: "9876543210", totalFee: 48000, paidAmount: 48000, status: "paid",    dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 16000, mode: "UPI",    receipt: "RC031" }, { date: "2026-05-01", amount: 16000, mode: "UPI",    receipt: "RC032" }, { date: "2026-06-01", amount: 16000, mode: "UPI",    receipt: "RC033" }] },
-  { id: 14, studentName: "Aryan Mehta",     rollNo: "SN002", class: "Playgroup", parentName: "Suresh Mehta",    parentPhone: "9876543211", totalFee: 48000, paidAmount: 32000, status: "due",     dueDate: "2026-06-01", payments: [{ date: "2026-04-01", amount: 16000, mode: "Cash",   receipt: "RC034" }, { date: "2026-05-01", amount: 16000, mode: "Cash",   receipt: "RC035" }] },
-  { id: 15, studentName: "Dev Sharma",      rollNo: "SN004", class: "Playgroup", parentName: "Vikram Sharma",   parentPhone: "9876543213", totalFee: 48000, paidAmount: 16000, status: "overdue", dueDate: "2026-04-30", payments: [{ date: "2026-04-01", amount: 16000, mode: "UPI",    receipt: "RC036" }] },
-];
+function fmt(n: number) { return "₹" + n.toLocaleString("en-IN"); }
 
-const MONTHS = ["April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"];
-
-const MONTHLY_COLLECTION = [
-  { month: "Apr", collected: 452000, target: 600000 },
-  { month: "May", collected: 388000, target: 600000 },
-  { month: "Jun", collected: 120000, target: 600000 },
-];
-
-function fmt(n: number) {
-  return "₹" + n.toLocaleString("en-IN");
+function deriveStatus(rows: FeePaymentRow[]): StudentSummary["overallStatus"] {
+  if (rows.every(r => r.status === "paid")) return "paid";
+  if (rows.some(r => r.status === "overdue")) return "overdue";
+  if (rows.some(r => r.amount_paid > 0)) return "partial";
+  return "due";
 }
 
+/* ── Component ───────────────────────────────────────────── */
 export default function AdminFeesPage() {
-  const [user, setUser] = useState("");
+  const [userName, setUserName] = useState("");
+  const [rows, setRows] = useState<FeePaymentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [classFilter, setClassFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
-  const [collectFor, setCollectFor] = useState<FeeRecord | null>(null);
-  const [collectAmount, setCollectAmount] = useState("");
-  const [collectMode, setCollectMode] = useState<PayMode>("Cash");
-  const [records, setRecords] = useState<FeeRecord[]>(FEE_DATA);
-  const [liveFeeSummary, setLiveFeeSummary] = useState<{
-    id: string;
-    amount_due: number;
-    amount_paid: number;
-    status: string;
-    students: { name: string; class: string; section: string };
-    fee_structures: { name: string; term: string };
-  }[]>([]);
-  const [loadingFees, setLoadingFees] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  // Record payment modal
+  const [recordFor, setRecordFor] = useState<FeePaymentRow | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMode, setPayMode] = useState("Cash");
+  const [saving, setSaving] = useState(false);
+  const [flash, setFlash] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
-      setUser(user.user_metadata?.name || "Admin");
+    createClient().auth.getUser().then(({ data }) => {
+      if (data.user) setUserName(data.user.app_metadata?.name || data.user.email || "Admin");
     });
+    loadFees();
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      setLoadingFees(true);
-      try {
-        const res = await fetch("/api/fees");
-        if (res.ok) {
-          const { fees } = await res.json();
-          setLiveFeeSummary(fees ?? []);
-        }
-      } finally {
-        setLoadingFees(false);
-      }
-    })();
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return records.filter(r => {
-      if (classFilter !== "All" && r.class !== classFilter) return false;
-      if (statusFilter !== "All" && r.status !== statusFilter.toLowerCase()) return false;
-      if (q && !r.studentName.toLowerCase().includes(q) && !r.rollNo.toLowerCase().includes(q) && !r.parentName.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [search, classFilter, statusFilter, records]);
-
-  // Overall stats
-  const totalExpected = records.reduce((a, r) => a + r.totalFee, 0);
-  const totalCollected = records.reduce((a, r) => a + r.paidAmount, 0);
-  const totalDue = totalExpected - totalCollected;
-  const overdueCount = records.filter(r => r.status === "overdue").length;
-  const collectionPct = Math.round((totalCollected / totalExpected) * 100);
-
-  function collectFee() {
-    if (!collectFor || !collectAmount) return;
-    const amt = parseInt(collectAmount);
-    if (isNaN(amt) || amt <= 0) return;
-    setRecords(prev => prev.map(r => {
-      if (r.id !== collectFor.id) return r;
-      const newPaid = Math.min(r.paidAmount + amt, r.totalFee);
-      const newStatus: FeeStatus = newPaid >= r.totalFee ? "paid" : newPaid > 0 ? "partial" : "due";
-      return {
-        ...r,
-        paidAmount: newPaid,
-        status: newStatus,
-        payments: [...r.payments, {
-          date: "2026-05-20",
-          amount: amt,
-          mode: collectMode,
-          receipt: `RC${String(Math.floor(Math.random() * 900) + 100)}`,
-        }],
-      };
-    }));
-    setCollectFor(null);
-    setCollectAmount("");
+  async function loadFees() {
+    setLoading(true);
+    const res = await fetch("/api/fees");
+    const json = await res.json();
+    if (json.error) { setError(json.error); setLoading(false); return; }
+    setRows(json.fees ?? []);
+    setLoading(false);
   }
 
-  const hasFilters = search || classFilter !== "All" || statusFilter !== "All";
+  // Group fee rows by student
+  const students = useMemo<StudentSummary[]>(() => {
+    const map = new Map<string, StudentSummary>();
+    for (const r of rows) {
+      const sid = r.student_id;
+      if (!map.has(sid)) {
+        map.set(sid, {
+          studentId: sid,
+          name: r.students?.name ?? "Unknown",
+          class: r.students?.class ?? "",
+          section: r.students?.section ?? "A",
+          rollNo: r.students?.roll_no ?? null,
+          parentName: r.students?.parent_name ?? null,
+          parentPhone: r.students?.parent_phone ?? null,
+          totalDue: 0, totalPaid: 0, outstanding: 0,
+          overallStatus: "due",
+          instalments: [],
+        });
+      }
+      const s = map.get(sid)!;
+      s.totalDue += r.amount_due;
+      s.totalPaid += r.amount_paid;
+      s.instalments.push(r);
+    }
+    for (const s of map.values()) {
+      s.outstanding = s.totalDue - s.totalPaid;
+      s.overallStatus = deriveStatus(s.instalments);
+      s.instalments.sort((a, b) => a.due_date.localeCompare(b.due_date));
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
+  const filtered = useMemo(() => students.filter(s => {
+    const matchClass = classFilter === "All" || s.class === classFilter;
+    const q = search.toLowerCase();
+    const matchSearch = !q || s.name.toLowerCase().includes(q) ||
+      (s.parentName?.toLowerCase().includes(q) ?? false) ||
+      (s.rollNo?.toLowerCase().includes(q) ?? false);
+    return matchClass && matchSearch;
+  }), [students, classFilter, search]);
+
+  // Summary stats
+  const totalDue = filtered.reduce((s, x) => s + x.totalDue, 0);
+  const totalPaid = filtered.reduce((s, x) => s + x.totalPaid, 0);
+  const totalOutstanding = filtered.reduce((s, x) => s + x.outstanding, 0);
+  const fullyPaid = filtered.filter(s => s.overallStatus === "paid").length;
+
+  function showFlash(type: "ok" | "err", msg: string) {
+    setFlash({ type, msg });
+    setTimeout(() => setFlash(null), 3500);
+  }
+
+  async function handleRecord() {
+    if (!recordFor || !payAmount) return;
+    setSaving(true);
+    const res = await fetch("/api/fees", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fee_payment_id: recordFor.id,
+        amount_paid: Number(payAmount),
+        mode: payMode,
+      }),
+    });
+    const json = await res.json();
+    setSaving(false);
+    if (json.error) { showFlash("err", json.error); return; }
+    showFlash("ok", `Payment recorded · Receipt: ${json.receipt_no}`);
+    setRecordFor(null); setPayAmount("");
+    await loadFees();
+  }
 
   return (
-    <ERPShell role="admin" userName={user}>
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+    <ERPShell role="admin" userName={userName}>
+      <div className="max-w-5xl mx-auto space-y-5">
+        {flash && (
+          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold ${flash.type === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}
+            style={{ fontFamily: "var(--font-nunito)" }}>
+            {flash.type === "ok" ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+            {flash.msg}
+          </div>
+        )}
+
+        {/* Header */}
         <div>
-          <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-playfair)" }}>Fee Management</h1>
-          <p className="text-sm mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-            Academic Year 2026–27 · Term 1 (Apr–Jun)
+          <h1 className="text-xl font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>Fee Management</h1>
+          <p className="text-sm text-gray-500 mt-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
+            Academic Year 2026-27 · {filtered.length} students
           </p>
         </div>
-        <button type="button"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold text-white"
-          style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 4px 14px rgba(124,58,237,0.25)", fontFamily: "var(--font-nunito)" }}>
-          <Download size={15} /> Export Report
-        </button>
-      </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        {[
-          { label: "Total Expected",  value: fmt(totalExpected),  color: "#7c3aed", bg: "rgba(167,139,250,0.10)" },
-          { label: "Collected",       value: fmt(totalCollected), color: "#6BCB77", bg: "rgba(107,203,119,0.10)" },
-          { label: "Outstanding",     value: fmt(totalDue),       color: "#FF6B6B", bg: "rgba(255,107,107,0.08)" },
-          { label: "Overdue Records", value: overdueCount,        color: "#dc2626", bg: "rgba(255,107,107,0.12)" },
-        ].map(s => (
-          <div key={s.label} className="glass-card p-4">
-            <p className="text-xs font-semibold mb-1" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>{s.label}</p>
-            <p className="text-xl font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Live fee collection */}
-      {liveFeeSummary.length > 0 && (
-        <div className="glass-card p-5 mb-4">
-          <p className="text-sm font-bold text-navy mb-3" style={{ fontFamily: "var(--font-nunito)" }}>
-            Live Fee Collection — AY 2026-27
-          </p>
-          {loadingFees && <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)" }}>Loading…</p>}
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {(() => {
-              const paid = liveFeeSummary.filter(f => f.status === "paid");
-              const pending = liveFeeSummary.filter(f => f.status === "pending" || f.status === "overdue");
-              const totalCollected = paid.reduce((s, f) => s + Number(f.amount_paid), 0);
-              const totalDue = pending.reduce((s, f) => s + Number(f.amount_due), 0);
-              return [
-                { label: "Collected",      value: `₹${totalCollected.toLocaleString("en-IN")}`, color: "#6BCB77" },
-                { label: "Pending",        value: `₹${totalDue.toLocaleString("en-IN")}`,       color: "#FF6B6B" },
-                { label: "Total Records",  value: String(liveFeeSummary.length),                color: "#1A1A2E" },
-              ].map(c => (
-                <div key={c.label} className="rounded-xl p-3 text-center" style={{ background: "rgba(26,26,46,0.04)" }}>
-                  <p className="text-lg font-bold" style={{ color: c.color, fontFamily: "var(--font-nunito)" }}>{c.value}</p>
-                  <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>{c.label}</p>
-                </div>
-              ));
-            })()}
-          </div>
-          <div className="space-y-1.5 max-h-60 overflow-y-auto">
-            {liveFeeSummary.slice(0, 20).map(f => (
-              <div key={f.id} className="flex items-center justify-between px-3 py-2 rounded-lg"
-                style={{ background: "rgba(26,26,46,0.03)" }}>
-                <div>
-                  <p className="text-xs font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{f.students.name}</p>
-                  <p className="text-xs" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>
-                    {f.students.class}-{f.students.section} · {f.fee_structures.name}
-                  </p>
-                </div>
-                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{
-                    background: f.status === "paid" ? "rgba(107,203,119,0.12)" : "rgba(255,107,107,0.10)",
-                    color: f.status === "paid" ? "#6BCB77" : "#FF6B6B",
-                    fontFamily: "var(--font-nunito)"
-                  }}>
-                  {f.status === "paid" ? "Paid" : "Due"}
-                </span>
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Total Billed",   value: fmt(totalDue),         color: "#4D96FF", icon: <IndianRupee size={16} /> },
+            { label: "Collected",      value: fmt(totalPaid),        color: "#16a34a", icon: <TrendingUp size={16} /> },
+            { label: "Outstanding",    value: fmt(totalOutstanding),  color: "#FF6B6B", icon: <AlertCircle size={16} /> },
+            { label: "Fully Paid",     value: `${fullyPaid}/${filtered.length}`, color: "#6BCB77", icon: <Users size={16} /> },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-2 mb-1" style={{ color: s.color }}>
+                {s.icon}
+                <p className="text-xs font-bold" style={{ fontFamily: "var(--font-nunito)", color: "rgba(26,26,46,0.50)" }}>{s.label}</p>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Collection progress + monthly trend */}
-      <div className="grid lg:grid-cols-3 gap-5 mb-6">
-        {/* Collection ring */}
-        <div className="glass-card p-5 flex flex-col items-center justify-center">
-          <p className="text-sm font-bold text-navy mb-4" style={{ fontFamily: "var(--font-nunito)" }}>Overall Collection</p>
-          <div className="relative w-28 h-28 mb-4">
-            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-              <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(26,26,46,0.06)" strokeWidth="3" />
-              <circle cx="18" cy="18" r="15.9" fill="none"
-                stroke={collectionPct >= 75 ? "#6BCB77" : "#d97706"} strokeWidth="3"
-                strokeDasharray={`${collectionPct} ${100 - collectionPct}`} strokeLinecap="round" />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className="text-2xl font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{collectionPct}%</p>
-              <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>collected</p>
+              <p className="text-lg font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>{s.value}</p>
             </div>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="relative flex-1 min-w-48">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl border text-sm" style={{ fontFamily: "var(--font-nunito)" }}
+              placeholder="Search student or parent…" />
           </div>
-          <div className="w-full space-y-1.5">
-            {[
-              { label: "Paid",    count: records.filter(r => r.status === "paid").length,    color: "#6BCB77" },
-              { label: "Partial", count: records.filter(r => r.status === "partial").length, color: "#d97706" },
-              { label: "Due",     count: records.filter(r => r.status === "due").length,     color: "#FF6B6B" },
-              { label: "Overdue", count: overdueCount,                                        color: "#dc2626" },
-            ].map(s => (
-              <div key={s.label} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: s.color }} />
-                  <span className="text-xs" style={{ color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-inter)" }}>{s.label}</span>
-                </div>
-                <span className="text-xs font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>{s.count} students</span>
-              </div>
+          <div className="flex gap-1.5 flex-wrap">
+            <Filter size={14} className="text-gray-400 self-center" />
+            {CLASSES.map(c => (
+              <button key={c} onClick={() => setClassFilter(c)}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+                style={{
+                  fontFamily: "var(--font-nunito)",
+                  background: classFilter === c ? "#FF6B6B" : "rgba(26,26,46,0.06)",
+                  color: classFilter === c ? "white" : "rgba(26,26,46,0.60)",
+                }}>
+                {c}
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Monthly bars */}
-        <div className="glass-card p-5 lg:col-span-2">
-          <p className="text-sm font-bold text-navy mb-4 flex items-center gap-2" style={{ fontFamily: "var(--font-nunito)" }}>
-            <TrendingUp size={14} style={{ color: "#7c3aed" }} /> Monthly Collection — Term 1
-          </p>
-          <div className="space-y-4">
-            {MONTHLY_COLLECTION.map(m => {
-              const pct = Math.round((m.collected / m.target) * 100);
+        {/* Student list */}
+        {loading ? (
+          <div className="text-center py-16 text-gray-400" style={{ fontFamily: "var(--font-nunito)" }}>Loading fees…</div>
+        ) : error ? (
+          <div className="bg-red-50 rounded-2xl p-6 text-center text-red-500 text-sm" style={{ fontFamily: "var(--font-nunito)" }}>{error}</div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-gray-100">
+            <p className="text-gray-400 font-semibold" style={{ fontFamily: "var(--font-nunito)" }}>No students found</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(s => {
+              const st = STATUS_STYLE[s.overallStatus];
+              const isOpen = expanded === s.studentId;
+              const pct = s.totalDue > 0 ? Math.round((s.totalPaid / s.totalDue) * 100) : 0;
               return (
-                <div key={m.month}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-xs font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{m.month} 2026</p>
-                    <p className="text-xs font-bold" style={{ color: pct >= 80 ? "#6BCB77" : "#d97706", fontFamily: "var(--font-nunito)" }}>
-                      {fmt(m.collected)} / {fmt(m.target)} ({pct}%)
-                    </p>
-                  </div>
-                  <div className="h-3 rounded-full overflow-hidden" style={{ background: "rgba(26,26,46,0.06)" }}>
-                    <div className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${pct}%`, background: pct >= 80 ? "linear-gradient(90deg,#6BCB77,#4CAF50)" : "linear-gradient(90deg,#d97706,#f59e0b)" }} />
-                  </div>
+                <div key={s.studentId} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <button type="button" onClick={() => setExpanded(isOpen ? null : s.studentId)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-50 transition-colors">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                      style={{ background: "#FF6B6B", fontFamily: "var(--font-nunito)" }}>
+                      {s.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-navy truncate" style={{ fontFamily: "var(--font-nunito)" }}>{s.name}</p>
+                        <span className="text-xs text-gray-400" style={{ fontFamily: "var(--font-nunito)" }}>{s.class}-{s.section}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="flex-1 h-1.5 rounded-full overflow-hidden max-w-32" style={{ background: "rgba(26,26,46,0.08)" }}>
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: "#6BCB77" }} />
+                        </div>
+                        <span className="text-xs text-gray-400" style={{ fontFamily: "var(--font-nunito)" }}>{pct}%</span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{fmt(s.totalPaid)}</p>
+                      {s.outstanding > 0 && (
+                        <p className="text-xs font-semibold" style={{ color: st.color, fontFamily: "var(--font-nunito)" }}>
+                          {fmt(s.outstanding)} due
+                        </p>
+                      )}
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0"
+                      style={{ background: st.bg, color: st.color, fontFamily: "var(--font-nunito)" }}>
+                      {st.label}
+                    </span>
+                    {isOpen ? <ChevronUp size={14} className="flex-shrink-0 text-gray-400" /> : <ChevronDown size={14} className="flex-shrink-0 text-gray-400" />}
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-4 pb-4 border-t border-gray-50">
+                      {s.parentName && (
+                        <p className="text-xs text-gray-400 mt-3 mb-2" style={{ fontFamily: "var(--font-nunito)" }}>
+                          Parent: <span className="font-semibold text-navy">{s.parentName}</span>
+                          {s.parentPhone && <> · {s.parentPhone}</>}
+                        </p>
+                      )}
+                      <div className="space-y-2">
+                        {s.instalments.map(inst => {
+                          const ist = inst.status === "paid"
+                            ? STATUS_STYLE.paid
+                            : inst.status === "overdue"
+                            ? STATUS_STYLE.overdue
+                            : STATUS_STYLE.due;
+                          return (
+                            <div key={inst.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                              style={{ background: ist.bg }}>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>
+                                  {inst.fee_structures?.name ?? "Instalment"}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5" style={{ fontFamily: "var(--font-nunito)" }}>
+                                  Due: {new Date(inst.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                  {inst.receipt_no && <> · <span className="font-semibold">{inst.receipt_no}</span></>}
+                                </p>
+                              </div>
+                              <p className="text-sm font-bold flex-shrink-0" style={{ color: ist.color, fontFamily: "var(--font-nunito)" }}>
+                                {fmt(inst.amount_due)}
+                              </p>
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                                style={{ background: "rgba(255,255,255,0.7)", color: ist.color, fontFamily: "var(--font-nunito)" }}>
+                                {ist.label}
+                              </span>
+                              {inst.status !== "paid" && (
+                                <button onClick={() => { setRecordFor(inst); setPayAmount(String(inst.amount_due)); }}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-bold text-white flex-shrink-0"
+                                  style={{ background: "#FF6B6B", fontFamily: "var(--font-nunito)" }}>
+                                  Record
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
-
-          {/* Fee structure */}
-          <div className="mt-5 pt-4" style={{ borderTop: "1px solid rgba(26,26,46,0.06)" }}>
-            <p className="text-xs font-bold text-navy mb-2" style={{ fontFamily: "var(--font-nunito)" }}>Annual Fee Structure</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { label: "Playgroup", fee: "₹48,000" },
-                { label: "Nursery",   fee: "₹54,000" },
-                { label: "JKG",       fee: "₹60,000" },
-                { label: "SKG",       fee: "₹66,000" },
-              ].map(f => (
-                <div key={f.label} className="p-2.5 rounded-xl text-center" style={{ background: "rgba(26,26,46,0.04)" }}>
-                  <p className="text-sm font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{f.fee}</p>
-                  <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>{f.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Collect fee modal */}
-      {collectFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.35)" }}>
-          <div className="w-full max-w-sm rounded-3xl p-6 shadow-2xl" style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(24px)" }}>
+      {/* Record Payment Modal */}
+      {recordFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.4)" }}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>Collect Fee</h3>
-              <button type="button" onClick={() => setCollectFor(null)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(26,26,46,0.06)" }}>
-                <X size={14} />
-              </button>
+              <h2 className="font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>Record Payment</h2>
+              <button onClick={() => setRecordFor(null)}><X size={18} className="text-gray-400" /></button>
             </div>
-            <p className="text-sm font-semibold text-navy mb-0.5" style={{ fontFamily: "var(--font-nunito)" }}>{collectFor.studentName}</p>
-            <p className="text-xs mb-4" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-              {collectFor.rollNo} · {collectFor.class} · Balance: {fmt(collectFor.totalFee - collectFor.paidAmount)}
-            </p>
-            <div className="space-y-3 mb-4">
+            <div className="space-y-1 mb-4 text-sm">
+              <p style={{ fontFamily: "var(--font-nunito)" }}>
+                <span className="text-gray-500">Student: </span>
+                <span className="font-bold text-navy">{recordFor.students?.name}</span>
+              </p>
+              <p style={{ fontFamily: "var(--font-nunito)" }}>
+                <span className="text-gray-500">For: </span>
+                <span className="font-semibold text-navy">{recordFor.fee_structures?.name}</span>
+              </p>
+              <p style={{ fontFamily: "var(--font-nunito)" }}>
+                <span className="text-gray-500">Amount Due: </span>
+                <span className="font-bold text-red-500">{fmt(recordFor.amount_due)}</span>
+              </p>
+            </div>
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-nunito)" }} htmlFor="col-amount">Amount (₹)</label>
-                <input id="col-amount" type="number" placeholder="Enter amount"
-                  value={collectAmount} onChange={e => setCollectAmount(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-sm"
-                  style={{ background: "rgba(26,26,46,0.05)", border: "1px solid rgba(26,26,46,0.10)", outline: "none", fontFamily: "var(--font-inter)" }}
-                />
+                <label className="text-xs font-bold text-gray-600 block mb-1" style={{ fontFamily: "var(--font-nunito)" }}>Amount Paid (₹)</label>
+                <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border text-sm font-semibold"
+                  style={{ fontFamily: "var(--font-nunito)" }} />
               </div>
               <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: "rgba(26,26,46,0.55)", fontFamily: "var(--font-nunito)" }} htmlFor="col-mode">Payment Mode</label>
-                <div className="flex gap-2">
-                  {(["Cash","UPI","Cheque","Online"] as PayMode[]).map(m => (
-                    <button key={m} type="button" onClick={() => setCollectMode(m)}
-                      className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all duration-150"
+                <label className="text-xs font-bold text-gray-600 block mb-1" style={{ fontFamily: "var(--font-nunito)" }}>Payment Mode</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PAY_MODES.map(m => (
+                    <button key={m} onClick={() => setPayMode(m)}
+                      className="py-2 rounded-xl text-xs font-bold transition-colors"
                       style={{
-                        background: collectMode === m ? "rgba(124,58,237,0.12)" : "rgba(26,26,46,0.05)",
-                        color: collectMode === m ? "#7c3aed" : "rgba(26,26,46,0.55)",
                         fontFamily: "var(--font-nunito)",
-                        border: collectMode === m ? "1px solid rgba(124,58,237,0.30)" : "1px solid transparent",
+                        background: payMode === m ? "#FF6B6B" : "rgba(26,26,46,0.06)",
+                        color: payMode === m ? "white" : "rgba(26,26,46,0.60)",
                       }}>
                       {m}
                     </button>
                   ))}
                 </div>
               </div>
+              <button onClick={handleRecord} disabled={saving || !payAmount}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                style={{ background: "#FF6B6B", fontFamily: "var(--font-nunito)" }}>
+                {saving ? "Saving…" : "Confirm Payment"}
+              </button>
             </div>
-            <button type="button" onClick={collectFee}
-              className="w-full py-2.5 rounded-2xl text-sm font-bold text-white transition-all duration-200 hover:-translate-y-0.5"
-              style={{ background: "linear-gradient(135deg, #7c3aed, #a78bfa)", boxShadow: "0 4px 14px rgba(124,58,237,0.25)", fontFamily: "var(--font-nunito)" }}>
-              Record Payment
-            </button>
           </div>
         </div>
       )}
-
-      {/* Search + filters */}
-      <div className="glass-card p-4 mb-4">
-        <div className="flex gap-3 flex-wrap">
-          <div className="flex-1 min-w-[180px] relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "rgba(26,26,46,0.35)" }} />
-            <input type="text" placeholder="Search student, roll no, parent…" value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl text-sm"
-              style={{ background: "rgba(26,26,46,0.05)", border: "1px solid rgba(26,26,46,0.08)", outline: "none", fontFamily: "var(--font-inter)", color: "rgba(26,26,46,0.80)" }}
-            />
-          </div>
-          <button type="button" onClick={() => setShowFilters(f => !f)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold transition-all duration-150"
-            style={{
-              background: showFilters ? "rgba(124,58,237,0.10)" : "rgba(26,26,46,0.05)",
-              color: showFilters ? "#7c3aed" : "rgba(26,26,46,0.60)",
-              fontFamily: "var(--font-nunito)",
-              border: `1px solid ${showFilters ? "rgba(124,58,237,0.25)" : "transparent"}`,
-            }}>
-            <Filter size={14} /> Filters
-            {hasFilters && <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#FF6B6B" }} />}
-          </button>
-          {hasFilters && (
-            <button type="button" onClick={() => { setSearch(""); setClassFilter("All"); setStatusFilter("All"); }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
-              style={{ background: "rgba(255,107,107,0.10)", color: "#FF6B6B", fontFamily: "var(--font-nunito)" }}>
-              <X size={13} /> Clear
-            </button>
-          )}
-        </div>
-
-        {showFilters && (
-          <div className="flex gap-4 flex-wrap mt-3 pt-3" style={{ borderTop: "1px solid rgba(26,26,46,0.06)" }}>
-            <div>
-              <p className="text-xs font-semibold mb-1.5" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>Class</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {CLASSES.map(c => (
-                  <button key={c} type="button" onClick={() => setClassFilter(c)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold"
-                    style={{ background: classFilter === c ? "rgba(124,58,237,0.12)" : "rgba(26,26,46,0.05)", color: classFilter === c ? "#7c3aed" : "rgba(26,26,46,0.55)", fontFamily: "var(--font-nunito)" }}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold mb-1.5" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>Status</p>
-              <div className="flex gap-1.5 flex-wrap">
-                {["All", "Paid", "Due", "Partial", "Overdue"].map(s => (
-                  <button key={s} type="button" onClick={() => setStatusFilter(s)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-semibold"
-                    style={{ background: statusFilter === s ? "rgba(255,107,107,0.10)" : "rgba(26,26,46,0.05)", color: statusFilter === s ? "#FF6B6B" : "rgba(26,26,46,0.55)", fontFamily: "var(--font-nunito)" }}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <p className="text-xs font-semibold px-1 mb-3" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-nunito)" }}>
-        {filtered.length} record{filtered.length !== 1 ? "s" : ""}
-      </p>
-
-      {/* Fee records list */}
-      <div className="space-y-2">
-        {filtered.map(rec => {
-          const isOpen = expanded === rec.id;
-          const balance = rec.totalFee - rec.paidAmount;
-          const pct = Math.round((rec.paidAmount / rec.totalFee) * 100);
-          const st = STATUS_STYLE[rec.status];
-
-          return (
-            <div key={rec.id} className="glass-card overflow-hidden"
-              style={{ border: rec.status === "overdue" ? "1.5px solid rgba(220,38,38,0.25)" : "1.5px solid rgba(255,255,255,0.60)" }}>
-              <div className="flex items-center gap-3 p-4">
-                <button type="button" className="flex-1 flex items-center gap-3 text-left min-w-0"
-                  onClick={() => setExpanded(isOpen ? null : rec.id)}>
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                    style={{ background: "rgba(255,217,61,0.15)" }}>
-                    {rec.studentName.includes("a") ? "👧" : "👦"}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{rec.studentName}</p>
-                      <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ background: st.bg, color: st.color, fontFamily: "var(--font-nunito)" }}>{st.label}</span>
-                    </div>
-                    <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>
-                      {rec.rollNo} · {rec.class} · {rec.parentName}
-                    </p>
-                  </div>
-                  <div className="hidden sm:block text-right flex-shrink-0 mr-2">
-                    <p className="text-sm font-bold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{fmt(rec.paidAmount)}</p>
-                    <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>of {fmt(rec.totalFee)}</p>
-                  </div>
-                  {isOpen ? <ChevronUp size={15} style={{ color: "rgba(26,26,46,0.40)", flexShrink: 0 }} /> : <ChevronDown size={15} style={{ color: "rgba(26,26,46,0.40)", flexShrink: 0 }} />}
-                </button>
-
-                {rec.status !== "paid" && (
-                  <button type="button" onClick={() => setCollectFor(rec)}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all duration-150 hover:-translate-y-0.5"
-                    style={{ background: "linear-gradient(135deg,#7c3aed,#a78bfa)", boxShadow: "0 3px 10px rgba(124,58,237,0.25)", fontFamily: "var(--font-nunito)" }}>
-                    Collect
-                  </button>
-                )}
-              </div>
-
-              {/* Progress bar */}
-              <div className="px-4 pb-2">
-                <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(26,26,46,0.06)" }}>
-                  <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct === 100 ? "#6BCB77" : pct >= 50 ? "#d97706" : "#FF6B6B" }} />
-                </div>
-              </div>
-
-              {isOpen && (
-                <div className="px-4 pb-4 border-t mt-2" style={{ borderColor: "rgba(26,26,46,0.06)" }}>
-                  {/* Summary row */}
-                  <div className="grid grid-cols-3 gap-3 my-4">
-                    {[
-                      { label: "Total Fee",  value: fmt(rec.totalFee),   color: "#7c3aed" },
-                      { label: "Paid",       value: fmt(rec.paidAmount), color: "#6BCB77" },
-                      { label: "Balance",    value: fmt(balance),         color: balance > 0 ? "#FF6B6B" : "#6BCB77" },
-                    ].map(s => (
-                      <div key={s.label} className="p-3 rounded-2xl text-center" style={{ background: `${s.color}10` }}>
-                        <p className="text-sm font-bold" style={{ color: s.color, fontFamily: "var(--font-nunito)" }}>{s.value}</p>
-                        <p className="text-xs mt-0.5" style={{ color: "rgba(26,26,46,0.50)", fontFamily: "var(--font-inter)" }}>{s.label}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Payment history */}
-                  <p className="text-xs font-bold text-navy mb-2" style={{ fontFamily: "var(--font-nunito)" }}>Payment History</p>
-                  <div className="space-y-2">
-                    {rec.payments.map(p => (
-                      <div key={p.receipt} className="flex items-center justify-between px-3 py-2.5 rounded-xl"
-                        style={{ background: "rgba(107,203,119,0.06)", border: "1px solid rgba(107,203,119,0.15)" }}>
-                        <div>
-                          <p className="text-xs font-semibold text-navy" style={{ fontFamily: "var(--font-nunito)" }}>{fmt(p.amount)}</p>
-                          <p className="text-xs" style={{ color: "rgba(26,26,46,0.45)", fontFamily: "var(--font-inter)" }}>
-                            {new Date(p.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} · {p.mode}
-                          </p>
-                        </div>
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(107,203,119,0.10)", color: "#6BCB77", fontFamily: "var(--font-nunito)" }}>
-                          {p.receipt}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <p className="text-xs mt-3" style={{ color: "rgba(26,26,46,0.40)", fontFamily: "var(--font-inter)" }}>
-                    Parent: {rec.parentName} · {rec.parentPhone} · Due by {new Date(rec.dueDate).toLocaleDateString("en-IN", { day: "numeric", month: "long" })}
-                  </p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
     </ERPShell>
   );
 }
